@@ -309,13 +309,15 @@ class Camera:
         self.shake_intensity = 0
         self.shake_offset_x = 0
         self.shake_offset_y = 0
-
+        self.cam_x = 0
+        self.cam_y = 0
     def shake(self, duration, intensity):
         """Déclenche un tremblement d'écran."""
         self.shake_duration = duration
         self.shake_intensity = intensity
 
     def update(self):
+        global _global_mouse_pos
         # --- Gestion du shake ---
         if self.shake_duration > 0:
             self.shake_duration -= 1
@@ -331,6 +333,7 @@ class Camera:
         # --- Offset souris ---
         mx = mouse_x()   # fonction globale de engine
         my = mouse_y()
+        _global_mouse_pos = (mx-self.cam_x,my-self.cam_y)
         center_x = self.width / 2
         center_y = self.height / 2
 
@@ -348,6 +351,7 @@ class Camera:
         # Calcul du décalage caméra à appliquer
         self.cam_x = target_screen_x - self.target.x + self.shake_offset_x
         self.cam_y = target_screen_y - self.target.y + self.shake_offset_y
+        
     def apply(self):
         """Applique la caméra calculée."""
         camera(self.cam_x, self.cam_y)    # fonction globale définie dans engine
@@ -415,6 +419,7 @@ class App:
 _app = None
 _width = 256
 _height = 256
+_global_mouse_pos= (0,0) 
 
 # Modules publics (remplis après init)
 graphics = Graphics()

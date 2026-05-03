@@ -8,23 +8,33 @@ class Player(Object):
         self.image_y=image_y
         self.last_dir='left'
     def draw(self):
-        e.blt(self.x,self.y+1,self.bank,3*8,6*8,8,8)
+        e.blt(self.x,self.y+1,self.bank,3*8,8*8,8,8)
+        last_dir_dict = {
+            "up":6,
+            "down":7,
+            "left":5,
+            "right":4
+        }
         match self.direction :
             case "idle":
-                self.animate(self.bank,0,5 if self.last_dir=='left' else 4,5,4)
+                self.animate(0,last_dir_dict[self.last_dir],5,4)
             case "up":
-                self.animate(self.bank,0,2,5,4)
+                self.animate(0,2,5,4)
+                self.last_dir="up"
             case "down":
-                self.animate(self.bank,0,3,5,4)
+                self.animate(0,3,5,4)
+                self.last_dir="down"  
             case "left":
-                self.animate(self.bank,0,1,5,4)
+                self.animate(0,1,5,4)
                 self.last_dir='left'
             case "right":
                 self.last_dir='right'
-                self.animate(self.bank,0,0,5,4)
-        return super().draw()
+                self.animate(0,0,5,4)
+        super().draw()
+        self.current_item.draw()
     def update(self):
         self.direction="idle"
+        self.current_item.update()
         if e.btn(e.KEY_W):
             self.direction="up"
             self.y-=self.speed
@@ -37,5 +47,5 @@ class Player(Object):
         if e.btn(e.KEY_D):
             self.direction="right"
             self.x+=self.speed
-        return super().update()
+        super().update()
     
