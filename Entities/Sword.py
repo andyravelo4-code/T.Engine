@@ -10,7 +10,7 @@ class Sword(Item):
     def __init__(self, x, y, w, h, bank, parent=None, speed=1):
         super().__init__(x, y, w, h, bank, parent, speed)
         self.rotation = 0
-        self.radius = 7
+        self.radius = 5
         self.pos_angle = 0
         self.start_slash_angle = 0
         
@@ -70,8 +70,9 @@ class Sword(Item):
 
     def draw(self):
         if not self.picked_up:
-            # Sprite au sol (index 0, 14)
-            self.draw_image(3, 9)
+            # Sprite au sol (index 3,9)
+            self.draw_image(3, 9,rotate=30)
+            self.draw_image(3,8,offset=(0,2))
         elif self.parent and self.parent.current_item == self:
             # Récupération de la portion de l'image (0, 14)
             sub = self.bank.subsurface((self.w * 3, self.h * 9, self.w, self.h))

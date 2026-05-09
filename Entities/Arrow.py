@@ -24,4 +24,4 @@ class Arrow(Object):
         # Utilise le sprite de la flèche (index 3, 12 d'après stuff.png)
         # On ajoute 90 degrés car le sprite est orienté vers le haut par défaut dans cette planche ?
         # Dans main.py test, rotate = r (le rt calculé)
-        self.draw_image(4, 6, rotate=math.degrees(self.angle) + 90)
+        self.draw_image(4, 6, rotate=-math.degrees(self.angle) + 90)

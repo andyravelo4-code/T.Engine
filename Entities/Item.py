@@ -24,7 +24,8 @@ class Item(Object):
         if not self.picked_up:
             # Par défaut, on dessine le sprite (0, 0) de la banque d'images de l'item
             # Les sous-classes peuvent outrepasser cela.
-            self.draw_image(0, 0)
+            self.draw_image(0, 0,rotate=30)
+            
         elif self.parent and self.parent.current_item == self:
             # Si porté et actif, le dessin est géré par la sous-classe
             pass

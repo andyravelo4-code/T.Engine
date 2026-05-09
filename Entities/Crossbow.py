@@ -45,7 +45,8 @@ class Crossbow(Item):
     def draw(self):
         if not self.picked_up:
             # Sprite au sol (index 0, 12 d'après stuff.png)
-            self.draw_image(0,9 )
+            self.draw_image(0,9 ,rotate=30)
+            self.draw_image(3,8,offset=(0,2))
         elif self.parent and self.parent.current_item == self:
             # Sprite en main (index 1, 12 si tir, sinon 0, 12)
             idx_x = 1 if self.is_firing else 0
