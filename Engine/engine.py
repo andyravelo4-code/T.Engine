@@ -550,6 +550,26 @@ def dither(alpha):
 
 
 # Délégation entrée
+def mouse_x():
+    return _app.mouse_x if _app else 0
+
+
+def mouse_y():
+    return _app.mouse_y if _app else 0
+
+
+def mouse_btn(button):
+    return input.mouse_btn(button) if input else False
+
+
+def mouse_btnp(button):
+    return input.mouse_btnp(button) if input else False
+
+
+def mouse_btnr(button):
+    return input.mouse_btnr(button) if input else False
+
+
 def btn(key):
     return input.btn(key) if input else False
 
@@ -614,3 +634,7 @@ KEY_LALT = pygame.K_LALT
 KEY_RALT = pygame.K_RALT
 KEY_TAB = pygame.K_TAB
 KEY_BACKSPACE = pygame.K_BACKSPACE
+# Constantes de boutons de souris
+MOUSE_BUTTON_LEFT = 1
+MOUSE_BUTTON_MIDDLE = 2
+MOUSE_BUTTON_RIGHT = 3

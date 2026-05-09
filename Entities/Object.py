@@ -12,6 +12,13 @@ class Object:
         self.items=[]
         self.current_item=None
         pass
+    def is_collid(self, other):
+        """Vérifie la collision entre cet objet et un autre."""
+        return (self.x < other.x + other.w and
+                self.x + self.w > other.x and
+                self.y < other.y + other.h and
+                self.y + self.h > other.y)
+
     def draw(self):
         pass
     def update(self):
