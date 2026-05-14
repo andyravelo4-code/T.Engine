@@ -5,6 +5,7 @@ Sans limitation de palette ni de résolution.
 """
 
 import pygame
+import pygame
 import sys
 import random
 
@@ -158,7 +159,7 @@ class Audio:
 # Graphiques
 # ----------------------------------------------------------------------
 class Graphics:
-    def __init__(self, screen=None):
+    def __init__(self, screen : pygame.Surface =None):
         if screen:
             self.screen = screen
         self._clip_rect = None

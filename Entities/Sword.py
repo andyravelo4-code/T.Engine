@@ -17,7 +17,7 @@ class Sword(Item):
         # État de l'animation d'attaque (slash)
         self.is_slashing = False
         self.slash_timer = 0
-        self.slash_duration = 10
+        self.slash_duration = 8
         self.p = 1  # Direction du balancement
         self.n = 1  # Côté de repos
         self.flipped = False # État du miroir du sprite
@@ -71,8 +71,9 @@ class Sword(Item):
     def draw(self):
         if not self.picked_up:
             # Sprite au sol (index 3,9)
+            self.draw_image(3,8,offset=(2,2))
             self.draw_image(3, 9,rotate=30)
-            self.draw_image(3,8,offset=(0,2))
+            
         elif self.parent and self.parent.current_item == self:
             # Récupération de la portion de l'image (0, 14)
             sub = self.bank.subsurface((self.w * 3, self.h * 9, self.w, self.h))

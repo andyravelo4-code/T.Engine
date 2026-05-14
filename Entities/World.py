@@ -1,3 +1,5 @@
+from Engine import engine
+import Engine.engine
 class World:
     """
     Conteneur global pour toutes les entités du jeu.
@@ -26,5 +28,6 @@ class World:
 
     def draw(self):
         """Dessine toutes les entités."""
+        engine.circb(engine._global_mouse_pos[0],engine._global_mouse_pos[1],4,(255,255,255))
         for entity in self.entities:
             entity.draw()

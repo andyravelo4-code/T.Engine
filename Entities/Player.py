@@ -10,6 +10,7 @@ class Player(Object):
         self.last_dir='left'
     def draw(self):
         e.blt(self.x,self.y+1,self.bank,4*8,0*8,8,8)
+        #e.circb(self.x+3.5,self.y+7.5,4,(255,255,255))
         last_dir_dict = {
             "up":6,
             "down":7,
@@ -20,17 +21,17 @@ class Player(Object):
             case "idle":
                 self.animate(0,last_dir_dict[self.last_dir],5,4)
             case "up":
-                self.animate(0,2,5,4)
+                self.animate(0,2,6,4)
                 self.last_dir="up"
             case "down":
-                self.animate(0,3,5,4)
+                self.animate(0,3,6,4)
                 self.last_dir="down"  
             case "left":
-                self.animate(0,1,5,4)
+                self.animate(0,1,6,4)
                 self.last_dir='left'
             case "right":
                 self.last_dir='right'
-                self.animate(0,0,5,4)
+                self.animate(0,0,6,4)
         super().draw()
         if self.current_item:
             self.current_item.draw()
