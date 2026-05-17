@@ -1,4 +1,5 @@
 import math
+import pygame
 
 from Engine import engine as e
 from Entities.Object import Object
@@ -52,7 +53,7 @@ class Player(Object):
         # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
-            color = (0, 255, 0)  # Green
+            color = (95, 255, 129)  # Green
         elif health_ratio > 0.3:
             color = (255, 255, 0)  # Yellow
         else:
@@ -64,22 +65,32 @@ class Player(Object):
         if self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
             alpha = int(255 * (1.0 - progress))
-            import pygame
-            surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+            surf = pygame.Surface((64, 64), pygame.SRCALPHA)
             
-            center = (16, 16)
-            radius = 8 + progress * 4
+            center = (32, 32)
+            radius = 8 + progress * 5
             points = []
-            for i in range(-40, 41, 15):
+            
+            # Outer arc
+            for i in range(-70, 71, 10):
                 rad = math.radians(i) + self.punch_angle
                 px = center[0] + math.cos(rad) * radius
                 py = center[1] + math.sin(rad) * radius
                 points.append((px, py))
             
-            if len(points) >= 2:
-                pygame.draw.lines(surf, (255, 255, 255, alpha),False, points, 2)
+            # Inner arc
+            for i in range(70, -71, -10):
+                rad = math.radians(i) + self.punch_angle
+                thickness = 3 * math.cos(math.radians(i / 70 * 90))
+                r = radius - thickness
+                px = center[0] + math.cos(rad) * r
+                py = center[1] + math.sin(rad) * r
+                points.append((px, py))
             
-            e.graphics.screen.blit(surf, (self.x + self.w/2 - 16 + e.graphics._camera_x, self.y + self.h/2 - 16 + e.graphics._camera_y))
+            if len(points) >= 3:
+                pygame.draw.polygon(surf, (255, 255, 255, alpha), points)
+            
+            e.graphics.screen.blit(surf, (self.x + self.w/2 - 32 + e.graphics._camera_x, self.y + self.h/2 - 32 + e.graphics._camera_y))
 
     def update(self):
         world = self.world
@@ -148,6 +159,31 @@ class Player(Object):
             self.direction = "right"
             dx += self.speed
             self.last_dir = "right"
+            moving = True
+
+        # Lunge effect during attack
+        if not self.current_item and self.is_punching:
+            progress = 1.0 - (self.punch_timer / self.punch_duration)
+            # Quadratic ease-out speed
+            lunge_speed = 3.5 * (1.0 - progress)
+            dx += math.cos(self.punch_angle) * lunge_speed
+            dy += math.sin(self.punch_angle) * lunge_speed
+            moving = True
+
+        if self.current_item and getattr(self.current_item, "is_slashing", False):
+            if hasattr(self, "target"):
+                target_x = self.target.x
+                target_y = self.target.y
+            else:
+                target_x = e._global_mouse_pos[0]
+                target_y = e._global_mouse_pos[1]
+                
+            slash_angle = math.atan2(target_y - self.y, target_x - self.x)
+            progress = 1.0 - (self.current_item.slash_timer / self.current_item.slash_duration)
+            # Quadratic ease-out speed
+            lunge_speed = 3.5 * (1.0 - progress)
+            dx += math.cos(slash_angle) * lunge_speed
+            dy += math.sin(slash_angle) * lunge_speed
             moving = True
 
         # Move X and check collision

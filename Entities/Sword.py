@@ -111,6 +111,39 @@ class Sword(Item):
             self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=30)
 
         elif self.parent and self.parent.current_item == self:
+            # Draw slash arc
+            if self.is_slashing:
+                progress = 1.0 - (self.slash_timer / self.slash_duration)
+                alpha = int(255 * (1.0 - progress))
+                surf = pygame.Surface((64, 64), pygame.SRCALPHA)
+                
+                center = (32, 32)
+                radius = 15+ progress * 5
+                
+                current_angle = self.start_slash_angle + (math.pi * 1.0 * progress * self.p)
+                points = []
+                
+                # Outer arc
+                for i in range(-70, 71, 10):
+                    rad = math.radians(i) + current_angle
+                    px = center[0] + math.cos(rad) * radius
+                    py = center[1] + math.sin(rad) * radius
+                    points.append((px, py))
+                
+                # Inner arc
+                for i in range(70, -71, -10):
+                    rad = math.radians(i) + current_angle
+                    thickness = 3 * math.cos(math.radians(i / 70 * 90))
+                    r = radius - thickness
+                    px = center[0] + math.cos(rad) * r
+                    py = center[1] + math.sin(rad) * r
+                    points.append((px, py))
+                
+                if len(points) >= 3:
+                    pygame.draw.polygon(surf, (255, 255, 255, alpha), points)
+                
+                e.graphics.screen.blit(surf, (self.parent.x + self.parent.w/2 - 32 + e.graphics._camera_x, self.parent.y + self.parent.h/2 - 32 + e.graphics._camera_y))
+
             # Récupération de la portion de l'image
             sub = self.bank.subsurface((self.w * self.held_pos[0], self.h * self.held_pos[1], self.w, self.h))
 

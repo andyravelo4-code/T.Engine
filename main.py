@@ -26,14 +26,6 @@ crossbow = Crossbow(80, 40, 8, 8, img2, world=world)
 world.add(sword)
 world.add(crossbow)
 
-
-# Ajout d'obstacles
-world.add(Block(32, 32, 8, 8, img2, 2, 8))
-world.add(Block(40, 32, 8, 8, img2, 1, 8))
-world.add(Block(48, 32, 8, 8, img2, 2, 8))
-world.add(Block(32, 40, 8, 8, img2, 1, 8))
-world.add(Block(32, 48, 8, 8, img2, 2, 8))
-
 # Ajout du NPC
 frames_dict = {
     "idle_up": 6,
