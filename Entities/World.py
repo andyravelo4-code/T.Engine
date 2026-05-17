@@ -1,10 +1,13 @@
-from Engine import engine
 import Engine.engine
+from Engine import engine
+
+
 class World:
     """
     Conteneur global pour toutes les entités du jeu.
     Gère la mise à jour et le dessin de chaque entité.
     """
+
     def __init__(self):
         self.entities = []
 
@@ -23,11 +26,16 @@ class World:
         for entity in list(self.entities):
             entity.update()
             # Suppression automatique si l'entité a une durée de vie épuisée
-            if hasattr(entity, 'lifetime') and entity.lifetime <= 0:
+            if hasattr(entity, "lifetime") and entity.lifetime <= 0:
                 self.remove(entity)
 
     def draw(self):
         """Dessine toutes les entités."""
-        engine.circb(engine._global_mouse_pos[0],engine._global_mouse_pos[1],4,(255,255,255))
+        engine.circb(
+            engine._global_mouse_pos[0],
+            engine._global_mouse_pos[1],
+            4,
+            (255, 255, 255),
+        )
         for entity in self.entities:
             entity.draw()

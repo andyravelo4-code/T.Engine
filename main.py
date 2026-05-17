@@ -1,5 +1,7 @@
 from Engine import engine as e
 from Entities.Crossbow import Crossbow
+from Entities.Npc import Npc
+from Entities.Object import Object
 from Entities.Player import Player
 from Entities.Sword import Sword
 from Entities.World import World
@@ -22,6 +24,38 @@ crossbow = Crossbow(80, 40, 8, 8, img2, world=world)
 
 world.add(sword)
 world.add(crossbow)
+
+
+class Obstacle(Object):
+    def __init__(self, x, y, w, h):
+        super().__init__(x, y, w, h, None)
+        self.blocking = True
+
+    def draw(self):
+        e.rect(self.x, self.y, self.w, self.h, (100, 100, 100))
+
+
+# Ajout d'obstacles
+world.add(Obstacle(32, 32, 8, 8))
+world.add(Obstacle(40, 32, 8, 8))
+world.add(Obstacle(48, 32, 8, 8))
+world.add(Obstacle(32, 40, 8, 8))
+world.add(Obstacle(32, 48, 8, 8))
+
+# Ajout du NPC
+frames_dict = {
+    "idle_up": 6,
+    "idle_down": 7,
+    "idle_left": 5,
+    "idle_right": 4,
+    "walk_up": 2,
+    "walk_down": 3,
+    "walk_left": 1,
+    "walk_right": 0,
+}
+npc = Npc(80, 80, 8, 8, img, target=player, frames_dict=frames_dict, world=world)
+world.add(npc)
+
 
 # Création de la caméra
 cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.2, mouse_limit=10)
@@ -52,7 +86,6 @@ def update():
     # Mise à jour et application de la caméra
     cam.update()
     cam.apply()
-
     if e.btn(e.KEY_ESCAPE):
         e.quit()
 
@@ -66,7 +99,7 @@ def draw():
 
     # Interface fixe (hors caméra)
     e.camera()
-    # outline()
+    # outline(bg_color)
 
 
 e.run(update, draw)

@@ -4,10 +4,11 @@ Sans limitation de palette ni de résolution.
 À placer dans le même dossier que votre script principal.
 """
 
-import pygame
-import pygame
-import sys
 import random
+import sys
+
+import pygame
+
 
 # ----------------------------------------------------------------------
 # Entrées
@@ -159,7 +160,7 @@ class Audio:
 # Graphiques
 # ----------------------------------------------------------------------
 class Graphics:
-    def __init__(self, screen : pygame.Surface =None):
+    def __init__(self, screen: pygame.Surface = None):
         if screen:
             self.screen = screen
         self._clip_rect = None
@@ -175,7 +176,7 @@ class Graphics:
         x += self._camera_x
         y += self._camera_y
         if 0 <= x < self.screen.get_width() and 0 <= y < self.screen.get_height():
-            self.screen.set_at((x, y), color)
+            self.screen.set_at((int(x), int(y)), color)
 
     def pget(self, x, y):
         x += self._camera_x
@@ -296,15 +297,17 @@ class Graphics:
         pass
 
 
-
 class Camera:
     """Caméra réutilisable avec suivi de cible, offset souris et tremblement."""
-    def __init__(self, target, screen_width, screen_height, mouse_influence=0.2, mouse_limit=10):
-        self.target = target                # objet avec .x et .y
+
+    def __init__(
+        self, target, screen_width, screen_height, mouse_influence=0.2, mouse_limit=10
+    ):
+        self.target = target  # objet avec .x et .y
         self.width = screen_width
         self.height = screen_height
         self.mouse_influence = mouse_influence  # sensibilité du regard (0..1)
-        self.mouse_limit = mouse_limit          # amplitude max en pixels
+        self.mouse_limit = mouse_limit  # amplitude max en pixels
 
         self.shake_duration = 0
         self.shake_intensity = 0
@@ -312,6 +315,7 @@ class Camera:
         self.shake_offset_y = 0
         self.cam_x = 0
         self.cam_y = 0
+
     def shake(self, duration, intensity):
         """Déclenche un tremblement d'écran."""
         self.shake_duration = duration
@@ -325,16 +329,20 @@ class Camera:
             if self.shake_duration % 5 == 0:
                 self.shake_intensity = max(0, self.shake_intensity - 1)
         if self.shake_intensity > 0:
-            self.shake_offset_x = random.randint(-self.shake_intensity, self.shake_intensity)
-            self.shake_offset_y = random.randint(-self.shake_intensity, self.shake_intensity)
+            self.shake_offset_x = random.randint(
+                -self.shake_intensity, self.shake_intensity
+            )
+            self.shake_offset_y = random.randint(
+                -self.shake_intensity, self.shake_intensity
+            )
         else:
             self.shake_offset_x = 0
             self.shake_offset_y = 0
 
         # --- Offset souris ---
-        mx = mouse_x()   # fonction globale de engine
+        mx = mouse_x()  # fonction globale de engine
         my = mouse_y()
-        _global_mouse_pos = (mx-self.cam_x,my-self.cam_y)
+        _global_mouse_pos = (mx - self.cam_x, my - self.cam_y)
         center_x = self.width / 2
         center_y = self.height / 2
 
@@ -352,10 +360,12 @@ class Camera:
         # Calcul du décalage caméra à appliquer
         self.cam_x = target_screen_x - self.target.x + self.shake_offset_x
         self.cam_y = target_screen_y - self.target.y + self.shake_offset_y
-        
+
     def apply(self):
         """Applique la caméra calculée."""
-        camera(self.cam_x, self.cam_y)    # fonction globale définie dans engine
+        camera(self.cam_x, self.cam_y)  # fonction globale définie dans engine
+
+
 # ----------------------------------------------------------------------
 # Application principale
 # ----------------------------------------------------------------------
@@ -380,6 +390,7 @@ class App:
         self.graphics = Graphics(self.virtual_screen)
         self.audio = Audio()
         self.resources = Resources()
+        pygame.mouse.set_cursor(*pygame.cursors.tri_left)
 
     def run(self, update, draw):
         self.running = True
@@ -420,7 +431,7 @@ class App:
 _app = None
 _width = 256
 _height = 256
-_global_mouse_pos= (0,0) 
+_global_mouse_pos = (0, 0)
 
 # Modules publics (remplis après init)
 graphics = Graphics()
@@ -452,6 +463,7 @@ def quit():
 
 
 # Propriétés globales
+
 
 def width():
     return _width
