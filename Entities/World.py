@@ -37,5 +37,5 @@ class World:
             4,
             (255, 255, 255),
         )
-        for entity in self.entities:
+        for entity in sorted(self.entities, key=lambda e: e.y):
             entity.draw()

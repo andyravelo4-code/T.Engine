@@ -328,6 +328,9 @@ class Camera:
             self.shake_duration -= 1
             if self.shake_duration % 5 == 0:
                 self.shake_intensity = max(0, self.shake_intensity - 1)
+        else:
+            self.shake_intensity = 0
+            
         if self.shake_intensity > 0:
             self.shake_offset_x = random.randint(
                 -self.shake_intensity, self.shake_intensity
@@ -385,7 +388,7 @@ class App:
         self.frame_count = 0
         self.mouse_x = 0
         self.mouse_y = 0
-        self.virtual_screen = pygame.Surface((width, height))
+        self.virtual_screen = pygame.Surface((width, height), pygame.SRCALPHA)
         self.input = Input()
         self.graphics = Graphics(self.virtual_screen)
         self.audio = Audio()

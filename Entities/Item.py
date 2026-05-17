@@ -13,6 +13,7 @@ class Item(Object):
         super().__init__(x, y, w, h, bank, speed)
         self.parent = parent
         self.picked_up = False
+        self.world = None
 
     def update(self):
         super().update()

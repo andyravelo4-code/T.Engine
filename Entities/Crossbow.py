@@ -82,5 +82,5 @@ class Crossbow(Item):
         self.fire_timer = 15
         if self.world:
             # On crée la flèche à la position de l'arbalète
-            arrow = Arrow(self.x, self.y, angle, self.bank)
+            arrow = Arrow(self.x, self.y, angle, self.bank, world=self.world, shooter=self.parent)
             self.world.add(arrow)

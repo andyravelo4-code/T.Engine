@@ -5,8 +5,9 @@ from Entities.Object import Object
 
 
 class Player(Object):
-    def __init__(self, x, y, w, h, bank, image_x=0, image_y=0):
+    def __init__(self, x, y, w, h, bank, world=None, image_x=0, image_y=0):
         super().__init__(x, y, w, h, bank)
+        self.world = world
         self.image_x = image_x
         self.image_y = image_y
         self.last_dir = "left"
@@ -42,8 +43,14 @@ class Player(Object):
         super().draw()
         if self.current_item:
             self.current_item.draw()
+            
+        # Draw health bar
+        health_ratio = max(0, self.health / self.max_health)
+        e.rect(self.x, self.y - 4, self.w, 2, (255, 0, 0))
+        e.rect(self.x, self.y - 4, int(self.w * health_ratio), 2, (0, 255, 0))
 
-    def update(self, world):
+    def update(self):
+        world = self.world
         self.direction = "idle"
 
         # Mise à jour de l'item tenu
@@ -144,5 +151,12 @@ class Player(Object):
                 self.last_dir = "left"
             elif -135 < deg < -45:
                 self.last_dir = "up"
+
+        if moving and e.frame_count() % 5 == 0:
+            try:
+                from Entities.Particle import spawn_dust
+                spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
+            except ImportError:
+                pass
 
         super().update()

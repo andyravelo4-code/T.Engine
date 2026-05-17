@@ -15,8 +15,9 @@ bg_color = (112, 198, 169)
 # Initialisation du monde
 world = World()
 
-player = Player(10, 10, 8, 8, img)
+player = Player(10, 10, 8, 8, img, world=world)
 player.speed = 1
+world.add(player)
 
 # Création d'items au sol
 sword = Sword(40, 40, 8, 8, img2)
@@ -59,6 +60,7 @@ world.add(npc)
 
 # Création de la caméra
 cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.2, mouse_limit=10)
+e.active_camera = cam
 
 
 def outline(bg_color):
@@ -79,8 +81,7 @@ def outline(bg_color):
 
 
 def update():
-    # Mise à jour du joueur et du monde
-    player.update(world)
+    # Mise à jour du monde
     world.update()
 
     # Mise à jour et application de la caméra
@@ -93,9 +94,8 @@ def update():
 def draw():
     e.cls(bg_color)
 
-    # Dessin du monde et du joueur
+    # Dessin du monde (qui inclut maintenant le joueur)
     world.draw()
-    player.draw()
 
     # Interface fixe (hors caméra)
     e.camera()

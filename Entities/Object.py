@@ -14,7 +14,8 @@ class Object:
         self.current_item = None
         # Whether this object blocks movement for pathfinding
         self.blocking = False
-        pass
+        self.max_health = 100
+        self.health = 100
 
     def is_collid(self, other):
         """Vérifie la collision entre cet objet et un autre."""
@@ -31,6 +32,22 @@ class Object:
 
     def draw(self):
         pass
+
+    def take_damage(self, amount, world):
+        self.health -= amount
+        
+        # We spawn blood when hit
+        try:
+            from Entities.Particle import spawn_blood
+            spawn_blood(self.x + self.w / 2, self.y + self.h / 2, world)
+        except ImportError:
+            pass
+
+        if self.health <= 0:
+            if hasattr(self, 'current_item') and self.current_item:
+                # Drop items maybe?
+                pass
+            world.remove(self)
 
     def update(self):
         pass

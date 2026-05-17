@@ -25,6 +25,7 @@ class Sword(Item):
         self.p = 1  # Direction du balancement
         self.n = 1  # Côté de repos
         self.flipped = False  # État du miroir du sprite
+        self.hit_entities = []
 
     def update(self):
         super().update()
@@ -64,6 +65,21 @@ class Sword(Item):
 
             # La rotation suit l'angle de position
             self.rotation = math.degrees(self.pos_angle)
+
+            if self.world:
+                for entity in self.world.entities:
+                    if entity != self and entity != self.parent and hasattr(entity, 'take_damage'):
+                        dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
+                        if dist < 12 and entity not in self.hit_entities:
+                            self.hit_entities.append(entity)
+                            entity.take_damage(25, self.world)
+                            try:
+                                from Entities.Particle import spawn_hit
+                                spawn_hit(self.x, self.y, self.world, amount=5)
+                                if hasattr(e, 'active_camera'):
+                                    e.active_camera.shake(5, 3)
+                            except Exception:
+                                pass
 
             if self.slash_timer <= 0:
                 self.is_slashing = False
@@ -115,3 +131,4 @@ class Sword(Item):
         # Changement de côté pour le prochain coup
         self.n *= -1
         self.flipped = not self.flipped
+        self.hit_entities = []

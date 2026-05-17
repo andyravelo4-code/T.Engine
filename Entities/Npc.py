@@ -18,7 +18,7 @@ class Npc(Object):
         self.last_dir = "left"
         self.speed = 0.5
         self.state = "idle"
-        self.detection_radius = 80
+        self.detection_radius = 40
         self.attack_radius = 12
         self.attack_cooldown = 0
         self.path = []
@@ -102,6 +102,11 @@ class Npc(Object):
         super().draw()
         if self.current_item:
             self.current_item.draw()
+            
+        # Draw health bar
+        health_ratio = max(0, self.health / self.max_health)
+        e.rect(self.x, self.y - 4, self.w, 2, (255, 0, 0))
+        e.rect(self.x, self.y - 4, int(self.w * health_ratio), 2, (0, 255, 0))
 
     def update(self):
         world = self.world
@@ -192,6 +197,13 @@ class Npc(Object):
                             self.direction = "down"
                         else:
                             self.direction = "up"
+                            
+                    if e.frame_count() % 5 == 0:
+                        try:
+                            from Entities.Particle import spawn_dust
+                            spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
+                        except ImportError:
+                            pass
         else:
             self.state = "idle"
             self.path = []
