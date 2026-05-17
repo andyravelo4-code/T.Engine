@@ -1,10 +1,10 @@
 from Engine import engine as e
 from Entities.Crossbow import Crossbow
 from Entities.Npc import Npc
-from Entities.Object import Object
 from Entities.Player import Player
 from Entities.Sword import Sword
 from Entities.World import World
+from Entities.Block import Block
 
 e.init(200, 200, title="Game", fps=65, display_scale=4)
 e.resources.image(0, "./assests/images/feuille1.png")
@@ -27,21 +27,12 @@ world.add(sword)
 world.add(crossbow)
 
 
-class Obstacle(Object):
-    def __init__(self, x, y, w, h):
-        super().__init__(x, y, w, h, None)
-        self.blocking = True
-
-    def draw(self):
-        e.rect(self.x, self.y, self.w, self.h, (100, 100, 100))
-
-
 # Ajout d'obstacles
-world.add(Obstacle(32, 32, 8, 8))
-world.add(Obstacle(40, 32, 8, 8))
-world.add(Obstacle(48, 32, 8, 8))
-world.add(Obstacle(32, 40, 8, 8))
-world.add(Obstacle(32, 48, 8, 8))
+world.add(Block(32, 32, 8, 8, img2, 2, 8))
+world.add(Block(40, 32, 8, 8, img2, 1, 8))
+world.add(Block(48, 32, 8, 8, img2, 2, 8))
+world.add(Block(32, 40, 8, 8, img2, 1, 8))
+world.add(Block(32, 48, 8, 8, img2, 2, 8))
 
 # Ajout du NPC
 frames_dict = {

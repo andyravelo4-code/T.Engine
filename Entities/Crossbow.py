@@ -10,9 +10,15 @@ class Crossbow(Item):
     Arbalète capable de tirer des flèches.
     """
 
-    def __init__(self, x, y, w, h, bank, parent=None, world=None):
+    def __init__(self, x, y, w, h, bank, parent=None, world=None, damage=10,
+                 shadow_pos=(3, 8), dropped_pos=(0, 9), held_idle_pos=(0, 9), held_fire_pos=(1, 9)):
         super().__init__(x, y, w, h, bank, parent)
         self.world = world  # Référence au monde pour ajouter les flèches
+        self.damage = damage
+        self.shadow_pos = shadow_pos
+        self.dropped_pos = dropped_pos
+        self.held_idle_pos = held_idle_pos
+        self.held_fire_pos = held_fire_pos
         self.rotation = 0
         self.radius = 5
         self.is_firing = False
@@ -58,14 +64,13 @@ class Crossbow(Item):
 
     def draw(self):
         if not self.picked_up:
-            # Sprite au sol (index 0, 12 d'après stuff.png)
-            self.draw_image(3, 8, offset=(2, 2))
-            self.draw_image(0, 9, rotate=30)
+            self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(2, 2))
+            self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=30)
 
         elif self.parent and self.parent.current_item == self:
-            # Sprite en main (index 1, 12 si tir, sinon 0, 12)
-            idx_x = 1 if self.is_firing else 0
-            self.draw_image(idx_x, 9, rotate=-self.rotation)
+            idx_x = self.held_fire_pos[0] if self.is_firing else self.held_idle_pos[0]
+            idx_y = self.held_fire_pos[1] if self.is_firing else self.held_idle_pos[1]
+            self.draw_image(idx_x, idx_y, rotate=-self.rotation)
             mouse_angle = math.atan2(
                 e._global_mouse_pos[1] - (self.parent.y + self.parent.h / 2),
                 e._global_mouse_pos[0] - (self.parent.x + self.parent.w / 2),
@@ -82,5 +87,5 @@ class Crossbow(Item):
         self.fire_timer = 15
         if self.world:
             # On crée la flèche à la position de l'arbalète
-            arrow = Arrow(self.x, self.y, angle, self.bank, world=self.world, shooter=self.parent)
+            arrow = Arrow(self.x, self.y, angle, self.bank, world=self.world, shooter=self.parent, damage=self.damage)
             self.world.add(arrow)

@@ -7,9 +7,12 @@ from Entities.Object import Object
 
 class Npc(Object):
     def __init__(
-        self, x, y, w, h, bank, target, frames_dict, world, image_x=0, image_y=0
+        self, x, y, w, h, bank, target, frames_dict, world, image_x=0, image_y=0, aggressive=True, max_health=100
     ):
         super().__init__(x, y, w, h, bank)
+        self.aggressive = aggressive
+        self.max_health = max_health
+        self.health = max_health
         self.target = target
         self.frames_dict = frames_dict
         self.world = world
@@ -103,10 +106,16 @@ class Npc(Object):
         if self.current_item:
             self.current_item.draw()
             
-        # Draw health bar
+        # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
-        e.rect(self.x, self.y - 4, self.w, 2, (255, 0, 0))
-        e.rect(self.x, self.y - 4, int(self.w * health_ratio), 2, (0, 255, 0))
+        if health_ratio > 0.6:
+            color = (0, 255, 0)  # Green
+        elif health_ratio > 0.3:
+            color = (255, 255, 0)  # Yellow
+        else:
+            color = (255, 0, 0)  # Red
+            
+        e.circ(int(self.x + self.w / 2), int(self.y), 1, color)
 
     def update(self):
         world = self.world
@@ -144,7 +153,7 @@ class Npc(Object):
         if isinstance(self.current_item, Crossbow):
             current_attack_radius = 60
 
-        if dist < current_attack_radius:
+        if self.aggressive and dist < current_attack_radius:
             self.state = "attack"
             self._face_target()
             if self.current_item and self.attack_cooldown <= 0:
@@ -159,7 +168,7 @@ class Npc(Object):
                     angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
                     self.current_item.fire(angle)
                     self.attack_cooldown = 60
-        elif dist < self.detection_radius:
+        elif self.aggressive and dist < self.detection_radius:
             self.state = "chase"
             self.path_timer -= 1
             if self.path_timer <= 0:

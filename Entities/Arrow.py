@@ -10,10 +10,12 @@ class Arrow(Object):
     Projectile tiré par l'arbalète.
     """
 
-    def __init__(self, x, y, angle, bank, world=None, shooter=None):
+    def __init__(self, x, y, angle, bank, world=None, shooter=None, damage=10, sprite_pos=(4, 6)):
         super().__init__(x, y, 8, 8, bank)
         self.world = world
         self.shooter = shooter
+        self.damage = damage
+        self.sprite_pos = sprite_pos
         self.angle = angle
         self.speed = 4
         self.lifetime = 60  # Disparaît après 60 frames
@@ -33,7 +35,7 @@ class Arrow(Object):
                         # For simplicity, if we are within range:
                         dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
                         if dist < 8:
-                            entity.take_damage(10, self.world)
+                            entity.take_damage(self.damage, self.world)
                             try:
                                 from Entities.Particle import spawn_hit
                                 spawn_hit(self.x, self.y, self.world, amount=3)
@@ -48,7 +50,4 @@ class Arrow(Object):
         # Note : La suppression du monde doit être gérée par le World ou ici via une propriété
 
     def draw(self):
-        # Utilise le sprite de la flèche (index 3, 12 d'après stuff.png)
-        # On ajoute 90 degrés car le sprite est orienté vers le haut par défaut dans cette planche ?
-        # Dans main.py test, rotate = r (le rt calculé)
-        self.draw_image(4, 6, rotate=int(-math.degrees(self.angle) + self.offset + 90))
+        self.draw_image(self.sprite_pos[0], self.sprite_pos[1], rotate=int(-math.degrees(self.angle) + self.offset + 90))

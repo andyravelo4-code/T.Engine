@@ -11,8 +11,13 @@ class Sword(Item):
     Classe représentant une épée avec une capacité d'attaque (slash).
     """
 
-    def __init__(self, x, y, w, h, bank, parent=None, speed=1):
+    def __init__(self, x, y, w, h, bank, parent=None, speed=1, damage=25,
+                 shadow_pos=(3, 8), dropped_pos=(3, 9), held_pos=(2, 9)):
         super().__init__(x, y, w, h, bank, parent, speed)
+        self.damage = damage
+        self.shadow_pos = shadow_pos
+        self.dropped_pos = dropped_pos
+        self.held_pos = held_pos
         self.rotation = 0
         self.radius = 5.5
         self.pos_angle = 0
@@ -72,7 +77,7 @@ class Sword(Item):
                         dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
                         if dist < 12 and entity not in self.hit_entities:
                             self.hit_entities.append(entity)
-                            entity.take_damage(25, self.world)
+                            entity.take_damage(self.damage, self.world)
                             try:
                                 from Entities.Particle import spawn_hit
                                 spawn_hit(self.x, self.y, self.world, amount=5)
@@ -102,13 +107,12 @@ class Sword(Item):
 
     def draw(self):
         if not self.picked_up:
-            # Sprite au sol (index 3,9)
-            self.draw_image(3, 8, offset=(2, 2))
-            self.draw_image(3, 9, rotate=30)
+            self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(2, 2))
+            self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=30)
 
         elif self.parent and self.parent.current_item == self:
             # Récupération de la portion de l'image
-            sub = self.bank.subsurface((self.w * 2, self.h * 9, self.w, self.h))
+            sub = self.bank.subsurface((self.w * self.held_pos[0], self.h * self.held_pos[1], self.w, self.h))
 
             # On applique le flip horizontal pour refléter le sprite (réalisme)
             if self.flipped:

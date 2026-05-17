@@ -11,6 +11,11 @@ class Player(Object):
         self.image_x = image_x
         self.image_y = image_y
         self.last_dir = "left"
+        self.is_punching = False
+        self.punch_timer = 0
+        self.punch_duration = 10
+        self.punch_angle = 0
+        self.hit_entities = []
 
     def draw(self):
         e.blt(
@@ -44,10 +49,37 @@ class Player(Object):
         if self.current_item:
             self.current_item.draw()
             
-        # Draw health bar
+        # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
-        e.rect(self.x, self.y - 4, self.w, 2, (255, 0, 0))
-        e.rect(self.x, self.y - 4, int(self.w * health_ratio), 2, (0, 255, 0))
+        if health_ratio > 0.6:
+            color = (0, 255, 0)  # Green
+        elif health_ratio > 0.3:
+            color = (255, 255, 0)  # Yellow
+        else:
+            color = (255, 0, 0)  # Red
+            
+        e.circ(int(self.x + self.w / 2), int(self.y-3), 1, color)
+        
+        # Draw punch arc
+        if self.is_punching:
+            progress = 1.0 - (self.punch_timer / self.punch_duration)
+            alpha = int(255 * (1.0 - progress))
+            import pygame
+            surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+            
+            center = (16, 16)
+            radius = 8 + progress * 4
+            points = []
+            for i in range(-40, 41, 15):
+                rad = math.radians(i) + self.punch_angle
+                px = center[0] + math.cos(rad) * radius
+                py = center[1] + math.sin(rad) * radius
+                points.append((px, py))
+            
+            if len(points) >= 2:
+                pygame.draw.lines(surf, (255, 255, 255, alpha),False, points, 2)
+            
+            e.graphics.screen.blit(surf, (self.x + self.w/2 - 16 + e.graphics._camera_x, self.y + self.h/2 - 16 + e.graphics._camera_y))
 
     def update(self):
         world = self.world
@@ -158,5 +190,40 @@ class Player(Object):
                 spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
             except ImportError:
                 pass
+                
+        # Unarmed punch logic
+        if not self.current_item:
+            if e.mouse_btnp(e.MOUSE_BUTTON_LEFT) and not self.is_punching:
+                self.is_punching = True
+                self.punch_timer = self.punch_duration
+                self.hit_entities = []
+                self.punch_angle = math.atan2(
+                    e._global_mouse_pos[1] - (self.y + self.h/2),
+                    e._global_mouse_pos[0] - (self.x + self.w/2)
+                )
+
+        if self.is_punching:
+            self.punch_timer -= 1
+            if self.world:
+                for entity in self.world.entities:
+                    if entity != self and hasattr(entity, 'take_damage'):
+                        dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
+                        if dist < 18 and entity not in self.hit_entities:
+                            # check if the entity is within the punch angle sector
+                            angle_to_entity = math.atan2(entity.y + entity.h/2 - (self.y + self.h/2), entity.x + entity.w/2 - (self.x + self.w/2))
+                            angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
+                            if abs(angle_diff) < math.radians(90):
+                                self.hit_entities.append(entity)
+                                entity.take_damage(5, self.world)
+                                try:
+                                    from Entities.Particle import spawn_hit
+                                    spawn_hit(entity.x, entity.y, self.world, amount=3)
+                                    if hasattr(e, 'active_camera'):
+                                        e.active_camera.shake(3, 2)
+                                except Exception:
+                                    pass
+
+            if self.punch_timer <= 0:
+                self.is_punching = False
 
         super().update()
