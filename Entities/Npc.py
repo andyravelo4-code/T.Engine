@@ -84,23 +84,29 @@ class Npc(Object):
         return path
 
     def draw(self):
-        # Draw shadow like player
-        e.blt(int(self.x), int(self.y + 1), self.bank, 4 * 8, 0 * 8, 8, 8)
+        # Draw shadow
+        shadow_x, shadow_y = self.frames_dict.get("shadow", (4, 0))
+        e.blt(int(self.x), int(self.y + 1), self.bank, (self.image_x + shadow_x) * 8, (self.image_y + shadow_y) * 8, 8, 8)
         match self.direction:
             case "idle":
                 dir_key = f"idle_{self.last_dir}"
-                self.animate(0, self.frames_dict.get(dir_key, 4), 5, 4)
+                anim_x, anim_y = self.frames_dict.get(dir_key, (0, 4))
+                self.animate(anim_x, anim_y, 5, 4)
             case "up":
-                self.animate(0, self.frames_dict.get("walk_up", 2), 6, 4)
+                anim_x, anim_y = self.frames_dict.get("walk_up", (0, 2))
+                self.animate(anim_x, anim_y, 6, 4)
                 self.last_dir = "up"
             case "down":
-                self.animate(0, self.frames_dict.get("walk_down", 3), 6, 4)
+                anim_x, anim_y = self.frames_dict.get("walk_down", (0, 3))
+                self.animate(anim_x, anim_y, 6, 4)
                 self.last_dir = "down"
             case "left":
-                self.animate(0, self.frames_dict.get("walk_left", 1), 6, 4)
+                anim_x, anim_y = self.frames_dict.get("walk_left", (0, 1))
+                self.animate(anim_x, anim_y, 6, 4)
                 self.last_dir = "left"
             case "right":
-                self.animate(0, self.frames_dict.get("walk_right", 0), 6, 4)
+                anim_x, anim_y = self.frames_dict.get("walk_right", (0, 0))
+                self.animate(anim_x, anim_y, 6, 4)
                 self.last_dir = "right"
         super().draw()
         if self.current_item:
@@ -172,9 +178,15 @@ class Npc(Object):
             self.state = "chase"
             self.path_timer -= 1
             if self.path_timer <= 0:
-                self.path = self.a_star(
-                    (self.x, self.y), (self.target.x, self.target.y), world
-                )
+                start_pos = (self.path[0][0]*8, self.path[0][1]*8) if self.path else (self.x, self.y)
+                new_path = self.a_star(start_pos, (self.target.x, self.target.y), world)
+                if self.path and new_path:
+                    # Ignore the first node if it's the one we are currently moving towards
+                    if new_path[0] == self.path[0]:
+                        new_path.pop(0)
+                    self.path = [self.path[0]] + new_path
+                else:
+                    self.path = new_path
                 self.path_timer = self.path_delay
 
             if self.path:

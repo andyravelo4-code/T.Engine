@@ -11,7 +11,7 @@ class Crossbow(Item):
     """
 
     def __init__(self, x, y, w, h, bank, parent=None, world=None, damage=10,
-                 shadow_pos=(3, 8), dropped_pos=(0, 9), held_idle_pos=(0, 9), held_fire_pos=(1, 9)):
+                 shadow_pos=(0, 0), dropped_pos=(0, 9), held_idle_pos=(0, 9), held_fire_pos=(1, 9)):
         super().__init__(x, y, w, h, bank, parent)
         self.world = world  # Référence au monde pour ajouter les flèches
         self.damage = damage

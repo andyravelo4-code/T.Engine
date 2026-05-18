@@ -38,7 +38,7 @@ class Object:
         
         # We spawn blood when hit
         try:
-            from Entities.Particle import spawn_blood
+            from Entities.Particle import spawn_hit,spawn_blood
             spawn_blood(self.x + self.w / 2, self.y + self.h / 2, world)
         except ImportError:
             pass
@@ -65,13 +65,15 @@ class Object:
         )
 
     def animate(self, index_x, index_y, intervall, nbr_frames):
-        self.u = index_x * self.w + e.frame_count() // intervall % nbr_frames * self.w
+        img_x = getattr(self, "image_x", 0)
+        img_y = getattr(self, "image_y", 0)
+        self.u = (img_x + index_x) * self.w + e.frame_count() // intervall % nbr_frames * self.w
         e.blt(
             round(self.x),
             round(self.y),
             self.bank,
             self.u,
-            index_y * self.h,
+            (img_y + index_y) * self.h,
             self.w,
             self.h,
             0,

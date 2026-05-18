@@ -6,13 +6,12 @@ from Entities.Sword import Sword
 from Entities.World import World
 from Entities.Block import Block
 
-e.init(200, 200, title="Game", fps=65, display_scale=4)
+e.init(200, 200, title="Game", fps=60, display_scale=4)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
 img = e.resources.images[0]
 img2 = e.resources.images[1]
-bg_color = (112, 198, 169)
-# Initialisation du monde
+bg_color = (112, 118, 169)
 world = World()
 
 player = Player(10, 10, 8, 8, img, world=world)
@@ -28,16 +27,17 @@ world.add(crossbow)
 
 # Ajout du NPC
 frames_dict = {
-    "idle_up": 6,
-    "idle_down": 7,
-    "idle_left": 5,
-    "idle_right": 4,
-    "walk_up": 2,
-    "walk_down": 3,
-    "walk_left": 1,
-    "walk_right": 0,
+    "shadow": (-4, 0),
+    "idle_up": (0, 6),
+    "idle_down": (0, 7),
+    "idle_left": (0, 5),
+    "idle_right": (0, 4),
+    "walk_up": (0, 2),
+    "walk_down": (0, 3),
+    "walk_left": (0, 1),
+    "walk_right": (0, 0),
 }
-npc = Npc(80, 80, 8, 8, img, target=player, frames_dict=frames_dict, world=world)
+npc = Npc(80, 80, 8, 8, img2, target=player, frames_dict=frames_dict, world=world,image_x=4)
 world.add(npc)
 
 

@@ -23,8 +23,8 @@ class Player(Object):
             self.x,
             self.y + 1,
             self.bank,
-            4 * 8,
-            0 * 8,
+            (self.image_x + 4) * 8,
+            (self.image_y + 0) * 8,
             8,
             8,
         )
@@ -59,7 +59,7 @@ class Player(Object):
         else:
             color = (255, 0, 0)  # Red
             
-        e.circ(int(self.x + self.w / 2), int(self.y-3), 1, color)
+        e.circ(int(self.x + self.w / 2), int(self.y-1), 1, color)
         
         # Draw punch arc
         if self.is_punching:

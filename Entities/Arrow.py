@@ -10,7 +10,7 @@ class Arrow(Object):
     Projectile tiré par l'arbalète.
     """
 
-    def __init__(self, x, y, angle, bank, world=None, shooter=None, damage=10, sprite_pos=(4, 6)):
+    def __init__(self, x, y, angle, bank, world=None, shooter=None, damage=10, sprite_pos=(0, 6)):
         super().__init__(x, y, 8, 8, bank)
         self.world = world
         self.shooter = shooter

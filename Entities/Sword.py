@@ -12,7 +12,7 @@ class Sword(Item):
     """
 
     def __init__(self, x, y, w, h, bank, parent=None, speed=1, damage=25,
-                 shadow_pos=(3, 8), dropped_pos=(3, 9), held_pos=(2, 9)):
+                 shadow_pos=(0, 0), dropped_pos=(3, 9), held_pos=(2, 9)):
         super().__init__(x, y, w, h, bank, parent, speed)
         self.damage = damage
         self.shadow_pos = shadow_pos

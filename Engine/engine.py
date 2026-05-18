@@ -393,7 +393,7 @@ class App:
         self.graphics = Graphics(self.virtual_screen)
         self.audio = Audio()
         self.resources = Resources()
-        pygame.mouse.set_cursor(*pygame.cursors.tri_left)
+        pygame.mouse.set_cursor(*pygame.cursors.broken_x)
 
     def run(self, update, draw):
         self.running = True
