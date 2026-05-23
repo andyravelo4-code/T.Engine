@@ -14,17 +14,20 @@ class Object:
         self.current_item = None
         # Whether this object blocks movement for pathfinding
         self.blocking = False
+        self.is_living = False
+        self.hitbox_inset = 0
         self.max_health = 100
         self.health = 100
 
+    @property
+    def hitbox(self):
+        ins = self.hitbox_inset
+        return (self.x + ins, self.y + ins, self.w - ins * 2, self.h - ins * 2)
+
     def is_collid(self, other):
-        """Vérifie la collision entre cet objet et un autre."""
-        return (
-            self.x < other.x + other.w
-            and self.x + self.w > other.x
-            and self.y < other.y + other.h
-            and self.y + self.h > other.y
-        )
+        hx, hy, hw, hh = self.hitbox
+        ox, oy, ow, oh = other.hitbox
+        return hx < ox + ow and hx + hw > ox and hy < oy + oh and hy + hh > oy
 
     @property
     def get_center(self):
@@ -35,18 +38,17 @@ class Object:
 
     def take_damage(self, amount, world):
         self.health -= amount
-        
-        # We spawn blood when hit
+
         try:
-            from Entities.Particle import spawn_hit,spawn_blood
-            spawn_blood(self.x + self.w / 2, self.y + self.h / 2, world)
+            from Entities.Particle import spawn_blood, spawn_hit
+            if self.is_living:
+                spawn_blood(self.x + self.w / 2, self.y + self.h / 2, world)
+            else:
+                spawn_hit(self.x + self.w / 2, self.y + self.h / 2, world, amount=3)
         except ImportError:
             pass
 
         if self.health <= 0:
-            if hasattr(self, 'current_item') and self.current_item:
-                # Drop items maybe?
-                pass
             world.remove(self)
 
     def update(self):

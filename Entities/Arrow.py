@@ -36,13 +36,8 @@ class Arrow(Object):
                         dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
                         if dist < 8:
                             entity.take_damage(self.damage, self.world)
-                            try:
-                                from Entities.Particle import spawn_hit
-                                spawn_hit(self.x, self.y, self.world, amount=3)
-                                if hasattr(e, 'active_camera'):
-                                    e.active_camera.shake(3, 2)
-                            except Exception:
-                                pass
+                            if hasattr(e, 'active_camera'):
+                                e.active_camera.shake(3, 2)
                             self.lifetime = 0
                             break
 

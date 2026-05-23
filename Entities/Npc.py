@@ -18,15 +18,16 @@ class Npc(Object):
         self.world = world
         self.image_x = image_x
         self.image_y = image_y
+        self.is_living = True
         self.last_dir = "left"
         self.speed = 0.5
         self.state = "idle"
         self.detection_radius = 40
-        self.attack_radius = 12
+        self.attack_radius = 16
         self.attack_cooldown = 0
         self.path = []
         self.path_timer = 0
-        self.path_delay = 30  # Recalculate path every 30 frames
+        self.path_delay = 15 # Recalculate path every 30 frames
 
     def get_grid_pos(self, x, y):
         # We assume 8x8 grid cells for pathfinding
@@ -38,6 +39,13 @@ class Npc(Object):
     def a_star(self, start_pos, goal_pos, world):
         start = self.get_grid_pos(*start_pos)
         goal = self.get_grid_pos(*goal_pos)
+
+        # Borne la zone de recherche pour éviter l'explosion infinie
+        pad = 30
+        min_x = min(start[0], goal[0]) - pad
+        max_x = max(start[0], goal[0]) + pad
+        min_y = min(start[1], goal[1]) - pad
+        max_y = max(start[1], goal[1]) + pad
 
         frontier = []
         heapq.heappush(frontier, (0, start))
@@ -58,10 +66,13 @@ class Npc(Object):
             if current == goal:
                 break
 
-            # 4-way movement
             for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
                 next_node = (current[0] + dx, current[1] + dy)
+
                 if next_node in obstacles:
+                    continue
+
+                if not (min_x <= next_node[0] <= max_x and min_y <= next_node[1] <= max_y):
                     continue
 
                 new_cost = cost_so_far[current] + 1
@@ -74,7 +85,7 @@ class Npc(Object):
         path = []
         current = goal
         if current not in came_from:
-            return []  # No path found
+            return []
 
         while current != start:
             path.append(current)
@@ -115,13 +126,13 @@ class Npc(Object):
         # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
-            color = (0, 255, 0)  # Green
+            color = (0, 255, 0,70)  # Green
         elif health_ratio > 0.3:
-            color = (255, 255, 0)  # Yellow
+            color = (255, 255, 0,70)  # Yellow
         else:
-            color = (255, 0, 0)  # Red
+            color = (255, 0, 0,70)  # Red
             
-        e.circ(int(self.x + self.w / 2), int(self.y), 1, color)
+        e.circb(int(self.x + self.w / 2), int(self.y-2), 2, color)
 
     def update(self):
         world = self.world
@@ -160,71 +171,76 @@ class Npc(Object):
             current_attack_radius = 60
 
         if self.aggressive and dist < current_attack_radius:
-            self.state = "attack"
-            self._face_target()
-            if self.current_item and self.attack_cooldown <= 0:
-                if hasattr(self.current_item, "slash") and not getattr(
-                    self.current_item, "is_slashing", False
-                ):
-                    self.current_item.slash()
-                    self.attack_cooldown = 60
-                elif hasattr(self.current_item, "fire") and not getattr(
-                    self.current_item, "is_firing", False
-                ):
-                    angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
-                    self.current_item.fire(angle)
-                    self.attack_cooldown = 60
+            self.state = "attack" if world.active_npc is self else "idle"
+            if self.state == "attack":
+                self._face_target()
+                if self.current_item and self.attack_cooldown <= 0:
+                    if hasattr(self.current_item, "slash") and not getattr(
+                        self.current_item, "is_slashing", False
+                    ):
+                        self.current_item.slash()
+                        self.attack_cooldown = 60
+                    elif hasattr(self.current_item, "fire") and not getattr(
+                        self.current_item, "is_firing", False
+                    ):
+                        angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
+                        self.current_item.fire(angle)
+                        self.attack_cooldown = 60
+            if self.state == "idle":
+                self.path = []
         elif self.aggressive and dist < self.detection_radius:
-            self.state = "chase"
-            self.path_timer -= 1
-            if self.path_timer <= 0:
-                start_pos = (self.path[0][0]*8, self.path[0][1]*8) if self.path else (self.x, self.y)
-                new_path = self.a_star(start_pos, (self.target.x, self.target.y), world)
-                if self.path and new_path:
-                    # Ignore the first node if it's the one we are currently moving towards
-                    if new_path[0] == self.path[0]:
-                        new_path.pop(0)
-                    self.path = [self.path[0]] + new_path
-                else:
-                    self.path = new_path
-                self.path_timer = self.path_delay
-
-            if self.path:
-                next_node = self.path[0]
-                target_x = next_node[0] * 8
-                target_y = next_node[1] * 8
-
-                dx = target_x - self.x
-                dy = target_y - self.y
-                dist_to_node = math.hypot(dx, dy)
-
-                if dist_to_node <= self.speed:
-                    self.x = target_x
-                    self.y = target_y
-                    self.path.pop(0)
-                else:
-                    move_x = (dx / dist_to_node) * self.speed
-                    move_y = (dy / dist_to_node) * self.speed
-                    self.x += move_x
-                    self.y += move_y
-
-                    if abs(move_x) > abs(move_y):
-                        if move_x > 0:
-                            self.direction = "right"
-                        else:
-                            self.direction = "left"
+            self.state = "chase" if world.active_npc is self else "idle"
+            if self.state == "chase":
+                self.path_timer -= 1
+                if self.path_timer <= 0:
+                    start_pos = (self.path[0][0]*8, self.path[0][1]*8) if self.path else (self.x, self.y)
+                    new_path = self.a_star(start_pos, (self.target.x, self.target.y), world)
+                    if self.path and new_path:
+                        if new_path[0] == self.path[0]:
+                            new_path.pop(0)
+                        self.path = [self.path[0]] + new_path
                     else:
-                        if move_y > 0:
-                            self.direction = "down"
+                        self.path = new_path
+                    self.path_timer = self.path_delay
+
+                if self.path:
+                    next_node = self.path[0]
+                    target_x = next_node[0] * 8
+                    target_y = next_node[1] * 8
+
+                    dx = target_x - self.x
+                    dy = target_y - self.y
+                    dist_to_node = math.hypot(dx, dy)
+
+                    if dist_to_node <= self.speed or dist_to_node < 0.01:
+                        self.x = target_x
+                        self.y = target_y
+                        self.path.pop(0)
+                    else:
+                        move_x = (dx / dist_to_node) * self.speed
+                        move_y = (dy / dist_to_node) * self.speed
+                        self.x += move_x
+                        self.y += move_y
+
+                        if abs(move_x) > abs(move_y):
+                            if move_x > 0:
+                                self.direction = "right"
+                            else:
+                                self.direction = "left"
                         else:
-                            self.direction = "up"
-                            
-                    if e.frame_count() % 5 == 0:
-                        try:
-                            from Entities.Particle import spawn_dust
-                            spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
-                        except ImportError:
-                            pass
+                            if move_y > 0:
+                                self.direction = "down"
+                            else:
+                                self.direction = "up"
+                                
+                        if e.frame_count() % 5 == 0:
+                            try:
+                                from Entities.Particle import spawn_dust
+                                spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
+                            except ImportError:
+                                pass
+            if self.state == "idle":
+                self.path = []
         else:
             self.state = "idle"
             self.path = []

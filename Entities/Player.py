@@ -3,6 +3,7 @@ import pygame
 
 from Engine import engine as e
 from Entities.Object import Object
+from Entities.Npc import Npc
 
 
 class Player(Object):
@@ -11,6 +12,8 @@ class Player(Object):
         self.world = world
         self.image_x = image_x
         self.image_y = image_y
+        self.is_living = True
+        self.hitbox_inset = 1
         self.last_dir = "left"
         self.is_punching = False
         self.punch_timer = 0
@@ -53,13 +56,13 @@ class Player(Object):
         # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
-            color = (95, 255, 129)  # Green
+            color = (95, 255, 129,50)  # Green
         elif health_ratio > 0.3:
-            color = (255, 255, 0)  # Yellow
+            color = (255, 255, 0,50)  # Yellow
         else:
-            color = (255, 0, 0)  # Red
+            color = (255, 0, 0,50)  # Red
             
-        e.circ(int(self.x + self.w / 2), int(self.y-1), 1, color)
+        e.circb(int(self.x + self.w / 2), int(self.y-1.5), 2, color)
         
         # Draw punch arc
         if self.is_punching:
@@ -190,7 +193,7 @@ class Player(Object):
         if dx != 0:
             self.x += dx
             for obj in world.entities:
-                if getattr(obj, "blocking", False) and obj != self:
+                if getattr(obj, "blocking", False) and obj != self and not isinstance(obj, Npc):
                     if self.is_collid(obj):
                         self.x -= dx
                         break
@@ -199,7 +202,7 @@ class Player(Object):
         if dy != 0:
             self.y += dy
             for obj in world.entities:
-                if getattr(obj, "blocking", False) and obj != self:
+                if getattr(obj, "blocking", False) and obj != self and not isinstance(obj, Npc):
                     if self.is_collid(obj):
                         self.y -= dy
                         break
@@ -251,13 +254,8 @@ class Player(Object):
                             if abs(angle_diff) < math.radians(90):
                                 self.hit_entities.append(entity)
                                 entity.take_damage(5, self.world)
-                                try:
-                                    from Entities.Particle import spawn_hit
-                                    spawn_hit(entity.x, entity.y, self.world, amount=3)
-                                    if hasattr(e, 'active_camera'):
-                                        e.active_camera.shake(3, 2)
-                                except Exception:
-                                    pass
+                                if hasattr(e, 'active_camera'):
+                                    e.active_camera.shake(3, 2)
 
             if self.punch_timer <= 0:
                 self.is_punching = False

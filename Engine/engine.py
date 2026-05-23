@@ -167,6 +167,22 @@ class Graphics:
         self._camera_x = 0
         self._camera_y = 0
 
+    def _has_alpha(self, color):
+        return isinstance(color, (tuple, list)) and len(color) == 4
+
+    def _draw_with_alpha(self, draw_func, *args):
+        if self._has_alpha(args[-1]):
+            color = args[-1]
+            temp_surf = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
+            orig_screen = self.screen
+            self.screen = temp_surf
+            draw_func(*args[:-1], color)
+            self.screen = orig_screen
+            temp_surf.blit(temp_surf, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+            orig_screen.blit(temp_surf, (0, 0))
+        else:
+            draw_func(*args)
+
     def cls(self, color):
         self.screen.fill(color)
 
@@ -186,58 +202,76 @@ class Graphics:
         return (0, 0, 0, 0)
 
     def line(self, x1, y1, x2, y2, color):
-        pygame.draw.line(
-            self.screen,
-            color,
-            (x1 + self._camera_x, y1 + self._camera_y),
-            (x2 + self._camera_x, y2 + self._camera_y),
-        )
+        def _draw_line(c):
+            pygame.draw.line(
+                self.screen,
+                c,
+                (x1 + self._camera_x, y1 + self._camera_y),
+                (x2 + self._camera_x, y2 + self._camera_y),
+            )
+        self._draw_with_alpha(_draw_line, color)
 
     def rect(self, x, y, w, h, color):
-        r = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-        if self._clip_rect:
-            r = r.clip(self._clip_rect)
-        pygame.draw.rect(self.screen, color, r)
+        def _draw_rect(c):
+            r = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
+            if self._clip_rect:
+                r = r.clip(self._clip_rect)
+            pygame.draw.rect(self.screen, c, r)
+        self._draw_with_alpha(_draw_rect, color)
 
     def rectb(self, x, y, w, h, color):
-        r = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-        if self._clip_rect:
-            r = r.clip(self._clip_rect)
-        pygame.draw.rect(self.screen, color, r, 1)
+        def _draw_rectb(c):
+            r = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
+            if self._clip_rect:
+                r = r.clip(self._clip_rect)
+            pygame.draw.rect(self.screen, c, r, 1)
+        self._draw_with_alpha(_draw_rectb, color)
 
     def circ(self, x, y, r, color):
-        pygame.draw.circle(
-            self.screen, color, (x + self._camera_x, y + self._camera_y), r
-        )
+        def _draw_circ(c):
+            pygame.draw.circle(
+                self.screen, c, (int(x + self._camera_x), int(y + self._camera_y)), r
+            )
+        self._draw_with_alpha(_draw_circ, color)
 
     def circb(self, x, y, r, color):
-        pygame.draw.circle(
-            self.screen, color, (x + self._camera_x, y + self._camera_y), r, 1
-        )
+        def _draw_circb(c):
+            pygame.draw.circle(
+                self.screen, c, (int(x + self._camera_x), int(y + self._camera_y)), r, 1
+            )
+        self._draw_with_alpha(_draw_circb, color)
 
     def elli(self, x, y, w, h, color):
-        rect = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-        pygame.draw.ellipse(self.screen, color, rect)
+        def _draw_elli(c):
+            rect = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
+            pygame.draw.ellipse(self.screen, c, rect)
+        self._draw_with_alpha(_draw_elli, color)
 
     def ellib(self, x, y, w, h, color):
-        rect = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-        pygame.draw.ellipse(self.screen, color, rect, 1)
+        def _draw_ellib(c):
+            rect = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
+            pygame.draw.ellipse(self.screen, c, rect, 1)
+        self._draw_with_alpha(_draw_ellib, color)
 
     def tri(self, x1, y1, x2, y2, x3, y3, color):
-        points = [
-            (x1 + self._camera_x, y1 + self._camera_y),
-            (x2 + self._camera_x, y2 + self._camera_y),
-            (x3 + self._camera_x, y3 + self._camera_y),
-        ]
-        pygame.draw.polygon(self.screen, color, points)
+        def _draw_tri(c):
+            points = [
+                (x1 + self._camera_x, y1 + self._camera_y),
+                (x2 + self._camera_x, y2 + self._camera_y),
+                (x3 + self._camera_x, y3 + self._camera_y),
+            ]
+            pygame.draw.polygon(self.screen, c, points)
+        self._draw_with_alpha(_draw_tri, color)
 
     def trib(self, x1, y1, x2, y2, x3, y3, color):
-        points = [
-            (x1 + self._camera_x, y1 + self._camera_y),
-            (x2 + self._camera_x, y2 + self._camera_y),
-            (x3 + self._camera_x, y3 + self._camera_y),
-        ]
-        pygame.draw.polygon(self.screen, color, points, 1)
+        def _draw_trib(c):
+            points = [
+                (x1 + self._camera_x, y1 + self._camera_y),
+                (x2 + self._camera_x, y2 + self._camera_y),
+                (x3 + self._camera_x, y3 + self._camera_y),
+            ]
+            pygame.draw.polygon(self.screen, c, points, 1)
+        self._draw_with_alpha(_draw_trib, color)
 
     def text(self, x, y, s, color, font=None):
         font = font or pygame.font.Font(None, 16)
@@ -393,7 +427,7 @@ class App:
         self.graphics = Graphics(self.virtual_screen)
         self.audio = Audio()
         self.resources = Resources()
-        pygame.mouse.set_cursor(*pygame.cursors.broken_x)
+        pygame.mouse.set_visible(False)
 
     def run(self, update, draw):
         self.running = True
@@ -407,8 +441,13 @@ class App:
             self.mouse_x //= self.display_scale
             self.mouse_y //= self.display_scale
 
-            update()
-            draw()
+            try:
+                update()
+                draw()
+            except Exception as err:
+                import traceback
+                traceback.print_exc()
+                self.running = False
 
             self.input.update()
 

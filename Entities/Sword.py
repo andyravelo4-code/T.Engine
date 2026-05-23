@@ -78,13 +78,8 @@ class Sword(Item):
                         if dist < 12 and entity not in self.hit_entities:
                             self.hit_entities.append(entity)
                             entity.take_damage(self.damage, self.world)
-                            try:
-                                from Entities.Particle import spawn_hit
-                                spawn_hit(self.x, self.y, self.world, amount=5)
-                                if hasattr(e, 'active_camera'):
-                                    e.active_camera.shake(5, 3)
-                            except Exception:
-                                pass
+                            if hasattr(e, 'active_camera'):
+                                e.active_camera.shake(5, 3)
 
             if self.slash_timer <= 0:
                 self.is_slashing = False
@@ -114,11 +109,11 @@ class Sword(Item):
             # Draw slash arc
             if self.is_slashing:
                 progress = 1.0 - (self.slash_timer / self.slash_duration)
-                alpha = int(255 * (1.0 - progress))
+                alpha = int(255 * (1 - progress))
                 surf = pygame.Surface((64, 64), pygame.SRCALPHA)
                 
                 center = (32, 32)
-                radius = 15+ progress * 5
+                radius = 12+ progress * 5
                 
                 current_angle = self.start_slash_angle + (math.pi * 1.0 * progress * self.p)
                 points = []
@@ -140,7 +135,7 @@ class Sword(Item):
                     points.append((px, py))
                 
                 if len(points) >= 3:
-                    pygame.draw.polygon(surf, (255, 255, 255, alpha), points)
+                    pygame.draw.polygon(surf, (255, 255, 255, (alpha+50)%255), points)
                 
                 e.graphics.screen.blit(surf, (self.parent.x + self.parent.w/2 - 32 + e.graphics._camera_x, self.parent.y + self.parent.h/2 - 32 + e.graphics._camera_y))
 

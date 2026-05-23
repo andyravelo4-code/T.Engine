@@ -1,31 +1,20 @@
 from Engine import engine as e
-from Entities.Crossbow import Crossbow
-from Entities.Npc import Npc
 from Entities.Player import Player
-from Entities.Sword import Sword
 from Entities.World import World
-from Entities.Block import Block
+from Entities.Map import Map
 
 e.init(200, 200, title="Game", fps=60, display_scale=4)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
 img = e.resources.images[0]
 img2 = e.resources.images[1]
-bg_color = (112, 118, 169)
+
 world = World()
 
 player = Player(10, 10, 8, 8, img, world=world)
 player.speed = 1
 world.add(player)
 
-# Création d'items au sol
-sword = Sword(40, 40, 8, 8, img2)
-crossbow = Crossbow(80, 40, 8, 8, img2, world=world)
-
-world.add(sword)
-world.add(crossbow)
-
-# Ajout du NPC
 frames_dict = {
     "shadow": (-4, 0),
     "idle_up": (0, 6),
@@ -37,37 +26,31 @@ frames_dict = {
     "walk_left": (0, 1),
     "walk_right": (0, 0),
 }
-npc = Npc(80, 80, 8, 8, img2, target=player, frames_dict=frames_dict, world=world,image_x=4)
-world.add(npc)
 
+# Associe chaque type de tuile à une zone dans une image bank
+# tile_images = {
+#     1: {"bank": img2, "image_x": 0, "image_y": 5},  # mur cave/dungeon
+#     2: {"bank": img2, "image_x": 4, "image_y": 7},  # eau island
+# }
 
-# Création de la caméra
+game_map = Map(world)
+game_map.generate(
+    "dungeon", 50, 50,
+    npc_count=8,
+    player=player,
+    frames_dict=frames_dict,
+    img=img,
+    img2=img2,
+    # tile_images=tile_images,  # décommente pour utiliser les sprites
+)
+bg_color = game_map.bg_color
+
 cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.2, mouse_limit=10)
 e.active_camera = cam
 
 
-def outline(bg_color):
-    for y in range(0, 121):
-        for x in range(0, 121):
-            if e.pget(x + 1, y) != bg_color and e.pget(x, y) == bg_color:
-                e.pset(x, y, (255, 255, 255))
-        for x in range(121, 0, -1):
-            if e.pget(x - 1, y) != bg_color and e.pget(x, y) == bg_color:
-                e.pset(x, y, (255, 255, 255))
-    for x in range(0, 121):
-        for y in range(121, 0, -1):
-            if e.pget(x, y - 1) != bg_color and e.pget(x, y) == bg_color:
-                e.pset(x, y, (255, 255, 255))
-        for y in range(0, 121):
-            if e.pget(x, y + 1) != bg_color and e.pget(x, y) == bg_color:
-                e.pset(x, y, (255, 255, 255))
-
-
 def update():
-    # Mise à jour du monde
     world.update()
-
-    # Mise à jour et application de la caméra
     cam.update()
     cam.apply()
     if e.btn(e.KEY_ESCAPE):
@@ -76,13 +59,9 @@ def update():
 
 def draw():
     e.cls(bg_color)
-
-    # Dessin du monde (qui inclut maintenant le joueur)
     world.draw()
-
-    # Interface fixe (hors caméra)
     e.camera()
-    # outline(bg_color)
 
 
-e.run(update, draw)
+if __name__ == "__main__":
+    e.run(update, draw)
