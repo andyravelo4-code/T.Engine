@@ -89,3 +89,16 @@ def spawn_hit(x, y, world, amount=5):
         
         p = Particle(x, y, vx, vy, color, lifetime, size=random.randint(1, 2))
         world.add(p)
+
+
+def spawn_bones(x, y, world, amount=4):
+    for _ in range(amount):
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(0.3, 1.2)
+        vx = math.cos(angle) * speed
+        vy = math.sin(angle) * speed
+        val = random.randint(180, 220)
+        color = (val, val, val - 20, 255)
+        lifetime = random.randint(15, 30)
+        p = Particle(x, y, vx, vy, color, lifetime, size=random.randint(1, 2))
+        world.add(p)

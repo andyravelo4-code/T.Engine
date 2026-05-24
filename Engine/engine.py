@@ -347,6 +347,11 @@ class Camera:
         self.shake_intensity = 0
         self.shake_offset_x = 0
         self.shake_offset_y = 0
+
+        self.flash_color = (255, 255, 255)
+        self.flash_alpha = 0
+        self.flash_duration = 0
+
         self.cam_x = 0
         self.cam_y = 0
 
@@ -355,8 +360,20 @@ class Camera:
         self.shake_duration = duration
         self.shake_intensity = intensity
 
+    def flash(self, color, alpha, duration):
+        """Déclenche un flash d'écran."""
+        self.flash_color = color
+        self.flash_alpha = alpha
+        self.flash_duration = duration
+
     def update(self):
         global _global_mouse_pos
+        # --- Flash overlay ---
+        if self.flash_alpha > 0:
+            self.flash_duration -= 1
+            if self.flash_duration <= 0:
+                self.flash_alpha = max(0, self.flash_alpha - 8)
+
         # --- Gestion du shake ---
         if self.shake_duration > 0:
             self.shake_duration -= 1

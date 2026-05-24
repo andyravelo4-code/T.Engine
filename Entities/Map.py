@@ -10,14 +10,14 @@ class Map:
     BIOME_BG = {
         "cave":    (20, 18, 25),
         "dungeon": (30, 30, 35),
-        "island":  (135, 206, 235),
+        "island":  (25, 40, 55),
     }
 
     # Fallback colors when no tile_images dict is provided
     FALLBACK_COLORS = {
         "cave":    {1: (80, 75, 65), 3: (100, 220, 255)},
         "dungeon": {1: (100, 100, 100), 3: (80, 80, 80), 4: (60, 55, 50)},
-        "island":  {2: (0, 105, 148), 3: (194, 178, 128), 4: (90, 85, 80)},
+        "island":  {2: (10, 55, 85), 3: (120, 105, 70), 4: (70, 65, 60)},
     }
 
     def __init__(self, world, tile_size=8):
@@ -29,7 +29,7 @@ class Map:
         self.biome = None
         self.bg_color = (0, 0, 0)
 
-    def generate(self, biome, map_width, map_height, npc_count=5, player=None, frames_dict=None, img=None, img2=None, tile_images=None):
+    def generate(self, biome, map_width, map_height, npc_count=5, player=None, frames_dicts=None, img2=None, tile_images=None):
         self.biome = biome
         self.bg_color = self.BIOME_BG.get(biome, (0, 0, 0))
         self.width = map_width
@@ -49,8 +49,8 @@ class Map:
             player.x = spawn[0]
             player.y = spawn[1]
 
-        if frames_dict and img2:
-            self._spawn_npcs(npc_count, player, frames_dict, img2)
+        if frames_dicts and img2:
+            self._spawn_npcs(npc_count, player, frames_dicts)
             self._place_items(img2)
 
     def _gen_cave(self):
@@ -159,23 +159,21 @@ class Map:
 
         for y in range(self.height):
             for x in range(self.width):
-                self.grid[y][x] = 2 if h[y][x] < 0.35 else 0
+                self.grid[y][x] = 2 if h[y][x] < 0.35 else 3
 
-        # Sable (tuile 3) en bordure d'eau
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
-                if self.grid[y][x] == 0:
-                    if any(self.grid[y + dy][x + dx] == 2 for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
-                        self.grid[y][x] = 3
-
-        # Rochers (tuile 4, bloquant) éparpillés sur la terre
+        # Rochers (tuile 4, bloquant) éparpillés sur le sable
         for y in range(2, self.height - 2):
             for x in range(2, self.width - 2):
-                if self.grid[y][x] == 0 and random.random() < 0.06:
+                if self.grid[y][x] == 3 and random.random() < 0.06:
                     self.grid[y][x] = 4
+
+    NON_BLOCKING_TILES = {
+        "island": {2, 3},  # eau et sable traversables
+    }
 
     def _build_blocks(self, tile_images=None):
         fallback = self.FALLBACK_COLORS.get(self.biome, {})
+        walkable = self.NON_BLOCKING_TILES.get(self.biome, set())
 
         for y in range(self.height):
             for x in range(self.width):
@@ -203,6 +201,8 @@ class Map:
                         None, color=color,
                     )
 
+                if tile in walkable:
+                    block.blocking = False
                 self.world.add(block)
 
     def get_spawn_point(self):
@@ -211,23 +211,29 @@ class Map:
             for dy in range(-r, r + 1):
                 for dx in range(-r, r + 1):
                     x, y = cx + dx, cy + dy
-                    if 0 <= x < self.width and 0 <= y < self.height and self.grid[y][x] == 0:
+                    if 0 <= x < self.width and 0 <= y < self.height and self._is_walkable(self.grid[y][x]):
                         return (x * self.tile_size, y * self.tile_size)
         return (cx * self.tile_size, cy * self.tile_size)
 
-    def _spawn_npcs(self, count, player, frames_dict, img):
+    def _is_walkable(self, tile):
+        if tile == 0:
+            return True
+        walkable = self.NON_BLOCKING_TILES.get(self.biome, set())
+        return tile in walkable
+
+    def _spawn_npcs(self, count, player, frames_dicts):
         spawned = 0
         attempts = 0
         while spawned < count and attempts < 2000:
             attempts += 1
             x = random.randint(2, self.width - 3)
             y = random.randint(2, self.height - 3)
-            if self.grid[y][x] == 0:
+            if self._is_walkable(self.grid[y][x]):
                 self.world.add(Npc(
                     x * self.tile_size, y * self.tile_size,
-                    self.tile_size, self.tile_size, img,
-                    target=player, frames_dict=frames_dict,
-                    world=self.world, image_x=4,
+                    self.tile_size, self.tile_size,
+                    target=player, frames_dict=random.choice(frames_dicts),
+                    world=self.world,
                 ))
                 spawned += 1
 
@@ -236,7 +242,7 @@ class Map:
             for _ in range(500):
                 x = random.randint(2, self.width - 3)
                 y = random.randint(2, self.height - 3)
-                if self.grid[y][x] == 0:
+                if self._is_walkable(self.grid[y][x]):
                     item = cls(x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size, img)
                     if hasattr(item, "world"):
                         item.world = self.world

@@ -7,17 +7,17 @@ from Entities.Object import Object
 
 class Npc(Object):
     def __init__(
-        self, x, y, w, h, bank, target, frames_dict, world, image_x=0, image_y=0, aggressive=True, max_health=100
+        self, x, y, w, h, target, frames_dict, world, aggressive=True, max_health=100
     ):
-        super().__init__(x, y, w, h, bank)
+        super().__init__(x, y, w, h, frames_dict["bank"])
         self.aggressive = aggressive
         self.max_health = max_health
         self.health = max_health
         self.target = target
         self.frames_dict = frames_dict
         self.world = world
-        self.image_x = image_x
-        self.image_y = image_y
+        self.image_x = frames_dict["image_x"]
+        self.image_y = frames_dict["image_y"]
         self.is_living = True
         self.last_dir = "left"
         self.speed = 0.5

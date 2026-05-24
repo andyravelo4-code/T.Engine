@@ -9,6 +9,10 @@ class Block(Object):
         self.image_y = image_y
         self.color = color if color else (100, 100, 100)
 
+    def take_damage(self, amount, world):
+        if self.blocking:
+            super().take_damage(amount, world)
+
     def draw(self):
         if self.bank:
             self.draw_image(self.image_x, self.image_y)

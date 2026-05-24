@@ -73,13 +73,18 @@ class Sword(Item):
 
             if self.world:
                 for entity in self.world.entities:
-                    if entity != self and entity != self.parent and hasattr(entity, 'take_damage'):
-                        dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
-                        if dist < 12 and entity not in self.hit_entities:
+                    if entity is self or entity is self.parent or not hasattr(entity, 'take_damage'):
+                        continue
+                    if not entity.is_living and not getattr(entity, 'blocking', False):
+                        continue
+                    dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
+                    if dist < 12 and entity not in self.hit_entities:
                             self.hit_entities.append(entity)
                             entity.take_damage(self.damage, self.world)
                             if hasattr(e, 'active_camera'):
                                 e.active_camera.shake(5, 3)
+                                if getattr(entity, 'is_living', False):
+                                    e.active_camera.flash((255, 230, 150), 30, 5)
 
             if self.slash_timer <= 0:
                 self.is_slashing = False

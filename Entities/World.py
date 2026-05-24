@@ -1,6 +1,7 @@
 import math
 import Engine.engine
 from Engine import engine
+from Entities.Block import Block
 
 
 class World:
@@ -56,12 +57,16 @@ class World:
                 self.remove(entity)
 
     def draw(self):
-        """Dessine toutes les entités."""
+        """Dessine d'abord les blocs (fond), puis les entités triées par y."""
+        blocks = [e for e in self.entities if isinstance(e, Block)]
+        others = [e for e in self.entities if not isinstance(e, Block)]
+        for e in blocks:
+            e.draw()
+        for e in sorted(others, key=lambda e: e.y):
+            e.draw()
         engine.circb(
             engine._global_mouse_pos[0],
             engine._global_mouse_pos[1],
             4,
             (255, 255, 255,50),
         )
-        for entity in sorted(self.entities, key=lambda e: e.y):
-            entity.draw()

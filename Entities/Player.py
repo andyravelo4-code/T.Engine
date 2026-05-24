@@ -56,11 +56,11 @@ class Player(Object):
         # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
-            color = (95, 255, 129,50)  # Green
+            color = (95, 255, 129,60)  # Green
         elif health_ratio > 0.3:
-            color = (255, 255, 0,50)  # Yellow
+            color = (255, 255, 0,60)  # Yellow
         else:
-            color = (255, 0, 0,50)  # Red
+            color = (255, 0, 0,60)  # Red
             
         e.circb(int(self.x + self.w / 2), int(self.y-1.5), 2, color)
         
@@ -68,32 +68,30 @@ class Player(Object):
         if self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
             alpha = int(255 * (1.0 - progress))
-            surf = pygame.Surface((64, 64), pygame.SRCALPHA)
-            
-            center = (32, 32)
-            radius = 8 + progress * 5
+            surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+
+            center = (16, 16)
+            radius = 7 + progress * 3
             points = []
-            
-            # Outer arc
-            for i in range(-70, 71, 10):
+
+            for i in range(-80, 81, 8):
                 rad = math.radians(i) + self.punch_angle
                 px = center[0] + math.cos(rad) * radius
                 py = center[1] + math.sin(rad) * radius
                 points.append((px, py))
-            
-            # Inner arc
-            for i in range(70, -71, -10):
+
+            for i in range(80, -81, -8):
                 rad = math.radians(i) + self.punch_angle
-                thickness = 3 * math.cos(math.radians(i / 70 * 90))
+                thickness = 2.5 * math.cos(math.radians(i / 80 * 90))
                 r = radius - thickness
                 px = center[0] + math.cos(rad) * r
                 py = center[1] + math.sin(rad) * r
                 points.append((px, py))
-            
+
             if len(points) >= 3:
                 pygame.draw.polygon(surf, (255, 255, 255, alpha), points)
-            
-            e.graphics.screen.blit(surf, (self.x + self.w/2 - 32 + e.graphics._camera_x, self.y + self.h/2 - 32 + e.graphics._camera_y))
+
+            e.graphics.screen.blit(surf, (self.x + self.w/2 - 16 + e.graphics._camera_x, self.y + self.h/2 - 16 + e.graphics._camera_y))
 
     def update(self):
         world = self.world
@@ -223,7 +221,7 @@ class Player(Object):
             elif -135 < deg < -45:
                 self.last_dir = "up"
 
-        if moving and e.frame_count() % 5 == 0:
+        if moving and e.frame_count() % 7 == 0:
             try:
                 from Entities.Particle import spawn_dust
                 spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
@@ -245,9 +243,12 @@ class Player(Object):
             self.punch_timer -= 1
             if self.world:
                 for entity in self.world.entities:
-                    if entity != self and hasattr(entity, 'take_damage'):
-                        dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
-                        if dist < 18 and entity not in self.hit_entities:
+                    if entity is self or not hasattr(entity, 'take_damage'):
+                        continue
+                    if not entity.is_living and not getattr(entity, 'blocking', False):
+                        continue
+                    dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
+                    if dist < 18 and entity not in self.hit_entities:
                             # check if the entity is within the punch angle sector
                             angle_to_entity = math.atan2(entity.y + entity.h/2 - (self.y + self.h/2), entity.x + entity.w/2 - (self.x + self.w/2))
                             angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
@@ -256,6 +257,8 @@ class Player(Object):
                                 entity.take_damage(5, self.world)
                                 if hasattr(e, 'active_camera'):
                                     e.active_camera.shake(3, 2)
+                                    if getattr(entity, 'is_living', False):
+                                        e.active_camera.flash((200, 220, 255), 25, 4)
 
             if self.punch_timer <= 0:
                 self.is_punching = False

@@ -38,17 +38,26 @@ class Object:
 
     def take_damage(self, amount, world):
         self.health -= amount
+        died = self.health <= 0
 
         try:
-            from Entities.Particle import spawn_blood, spawn_hit
+            from Entities.Particle import spawn_blood, spawn_hit, spawn_bones
             if self.is_living:
                 spawn_blood(self.x + self.w / 2, self.y + self.h / 2, world)
             else:
                 spawn_hit(self.x + self.w / 2, self.y + self.h / 2, world, amount=3)
+            if died:
+                spawn_bones(self.x + self.w / 2, self.y + self.h / 2, world)
         except ImportError:
             pass
 
-        if self.health <= 0:
+        if died:
+            try:
+                from Engine import engine
+                if self.is_living and hasattr(engine, 'active_camera'):
+                    engine.active_camera.flash((120, 255, 120), 35, 10)
+            except ImportError:
+                pass
             world.remove(self)
 
     def update(self):
