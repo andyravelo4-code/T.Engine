@@ -279,33 +279,25 @@ class Graphics:
         self.screen.blit(surf, (x + self._camera_x, y + self._camera_y))
 
     def blt(self, x, y, img, u, v, w, h, colkey=None, rotate=0):
-        """
-        Dessine une portion d'image avec rotation optionnelle.
-        Si rotate != 0, l'image tourne autour de son centre.
-        (x, y) correspond alors au coin supérieur gauche de la zone source
-        (le centre reste identique qu'il y ait rotation ou non).
-        """
-        # Extraction de la zone source
-        sub = img.subsurface((u, v, w, h))
+        dest_x = x + self._camera_x
+        dest_y = y + self._camera_y
 
         if rotate != 0:
-            # Rotation de la subsurface
+            sub = img.subsurface((u, v, w, h))
             sub = pygame.transform.rotate(sub, rotate)
             if colkey is not None:
                 sub.set_colorkey(colkey)
-
-            # Calcul du centre de la zone source AVANT rotation
-            cx = x + w / 2 + self._camera_x
-            cy = y + h / 2 + self._camera_y
-
-            # Positionnement de la subsurface tournée par rapport à son centre
+            cx = dest_x + w / 2
+            cy = dest_y + h / 2
             rect = sub.get_rect(center=(cx, cy))
             self.screen.blit(sub, rect.topleft)
         else:
-            # Comportement original, sans rotation
             if colkey is not None:
+                sub = img.subsurface((u, v, w, h))
                 sub.set_colorkey(colkey)
-            self.screen.blit(sub, (x + self._camera_x, y + self._camera_y))
+                self.screen.blit(sub, (dest_x, dest_y))
+            else:
+                self.screen.blit(img, (dest_x, dest_y), (u, v, w, h))
 
     def bltm(self, x, y, tm, u, v, w, h, colkey=None):
         pass  # non implémenté
@@ -439,7 +431,7 @@ class App:
         self.frame_count = 0
         self.mouse_x = 0
         self.mouse_y = 0
-        self.virtual_screen = pygame.Surface((width, height), pygame.SRCALPHA)
+        self.virtual_screen = pygame.Surface((width, height))
         self.input = Input()
         self.graphics = Graphics(self.virtual_screen)
         self.audio = Audio()

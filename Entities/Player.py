@@ -7,6 +7,8 @@ from Entities.Npc import Npc
 
 
 class Player(Object):
+    MAX_ITEMS = 6
+
     def __init__(self, x, y, w, h, bank, world=None, image_x=0, image_y=0):
         super().__init__(x, y, w, h, bank)
         self.world = world
@@ -20,6 +22,8 @@ class Player(Object):
         self.punch_duration = 10
         self.punch_angle = 0
         self.hit_entities = []
+        self.items = [None] * self.MAX_ITEMS
+        self.current_section = 0
 
     def draw(self):
         e.blt(
@@ -38,17 +42,17 @@ class Player(Object):
             case "idle":
                 self.animate(0, last_dir_dict[self.last_dir], 5, 4)
             case "up":
-                self.animate(0, 2, 6, 4)
+                self.animate(0, 2, 5, 4)
                 self.last_dir = "up"
             case "down":
-                self.animate(0, 3, 6, 4)
+                self.animate(0, 3, 5, 4)
                 self.last_dir = "down"
             case "left":
-                self.animate(0, 1, 6, 4)
+                self.animate(0, 1, 5, 4)
                 self.last_dir = "left"
             case "right":
                 self.last_dir = "right"
-                self.animate(0, 0, 6, 4)
+                self.animate(0, 0, 5, 4)
         super().draw()
         if self.current_item:
             self.current_item.draw()
@@ -106,24 +110,37 @@ class Player(Object):
         if e.btnp(e.KEY_E):
             from Entities.Item import Item
 
-            for obj in list(world.entities):
-                if isinstance(obj, Item) and not obj.picked_up:
-                    if self.is_collid(obj):
-                        obj.picked_up = True
-                        obj.parent = self
-                        # Donner la référence du monde aux armes (pour les flèches)
-                        if hasattr(obj, "world"):
-                            obj.world = world
-                        self.items.append(obj)
-                        if not self.current_item:
-                            self.current_item = obj
-                        world.remove(obj)
-                        break
+            slot = next((i for i, it in enumerate(self.items) if it is None), None)
+            if slot is not None:
+                for obj in list(world.entities):
+                    if isinstance(obj, Item) and not obj.picked_up:
+                        if self.is_collid(obj):
+                            obj.picked_up = True
+                            obj.parent = self
+                            if hasattr(obj, "world"):
+                                obj.world = world
+                            self.items[slot] = obj
+                            if not self.current_item:
+                                self.current_item = obj
+                            world.remove(obj)
+                            break
 
-        # Changer d'item (Q)
-        if e.btnp(e.KEY_F) and len(self.items) > 1:
-            idx = self.items.index(self.current_item)
-            self.current_item = self.items[(idx + 1) % len(self.items)]
+        # Changer d'item (F)
+        if e.btnp(e.KEY_F) and sum(1 for it in self.items if it) > 1:
+            idx = next(i for i, it in enumerate(self.items) if it is self.current_item)
+            for offset in range(1, 7):
+                nxt = (idx + offset) % 6
+                if self.items[nxt] is not None:
+                    self.current_item = self.items[nxt]
+                    self.current_section = 0 if nxt < 3 else 1
+                    break
+
+        # Sélection directe par chiffres 1-6
+        for i in range(6):
+            key = getattr(e, f"KEY_{i + 1}", None)
+            if key and e.btnp(key) and self.items[i] is not None:
+                self.current_item = self.items[i]
+                self.current_section = 0 if i < 3 else 1
 
         # Lâcher l'item (R)
         if e.btnp(e.KEY_R) and self.current_item:
@@ -134,8 +151,9 @@ class Player(Object):
             item_to_drop.y = self.y
 
             world.add(item_to_drop)
-            self.items.remove(item_to_drop)
-            self.current_item = self.items[0] if self.items else None
+            slot = self.items.index(item_to_drop)
+            self.items[slot] = None
+            self.current_item = next((it for it in self.items if it is not None), None)
 
         # --- Déplacement ---
         moving = False

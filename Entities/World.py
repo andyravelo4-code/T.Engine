@@ -64,9 +64,4 @@ class World:
             e.draw()
         for e in sorted(others, key=lambda e: e.y):
             e.draw()
-        engine.circb(
-            engine._global_mouse_pos[0],
-            engine._global_mouse_pos[1],
-            4,
-            (255, 255, 255,50),
-        )
+        
