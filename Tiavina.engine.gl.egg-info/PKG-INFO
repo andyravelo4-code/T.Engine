@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: Tiavina.engine.gl
-Version: 0.2.0
+Version: 0.3.0
 Summary: Moteur de jeu 2D sur PyOpenGL (GLFW + Pillow)
 License-Expression: GPL-3.0-only
 Project-URL: Homepage, https://github.com/andyravelo4-code/
@@ -345,7 +345,9 @@ Non implémenté dans `Tiavina.engine.gl` (stub).
 
 ```python
 resources.image(bank, path, colkey=None)   # → PIL.Image ou None
-resources.load(filename)                   # → lève NotImplementedError
+resources.sound(bank, path)                 # → DecodedSoundFile ou None
+resources.music(bank, path)                 # → None (enregistre le chemin)
+resources.load(filename)                    # → lève NotImplementedError
 ```
 
 ### Images
@@ -365,11 +367,72 @@ e.resources.image(1, "./sprites/tiles.png", (255, 0, 255))
 img = e.resources.images[1]
 ```
 
+### Sons
+
+`sound()` charge et décode un fichier audio (WAV, MP3, FLAC, OGG) via **miniaudio** et le stocke dans `resources.sounds[bank]` sous forme de `DecodedSoundFile` (PCM en mémoire).
+
+```python
+e.resources.sound(0, "./sfx/jump.wav")
+e.resources.sound(1, "./music/ambient.ogg")
+```
+
+### Musique
+
+`music()` enregistre le chemin d'un fichier dans `resources.musics[bank]` pour lecture différée via `audio.playm()`.
+
+```python
+e.resources.music(0, "./music/boss.ogg")
+```
+
 ---
 
 ## Audio — `Audio`
 
-**Non implémenté dans `Tiavina.engine.gl`.** Les méthodes sont des stubs (retournent `None` sans erreur).
+Moteur audio basé sur **miniaudio**. 8 canaux (0–7) pour les effets sonores, 1 flux pour la musique.
+
+### Initialisation
+
+L'`Audio` est créé automatiquement par `e.init()`. Les dictionnaires `sounds` et `musics` sont partagés avec `Resources` — les sons chargés via `e.resources.sound()` sont directement accessibles.
+
+### Méthodes
+
+| Méthode | Description |
+|---------|-------------|
+| `play(ch, s, loop=False)` | Joue le son `s` (clé) sur le canal `ch` (0–7). `loop=True` → boucle infinie |
+| `playm(m, loop=False)` | Joue la musique `m` (clé) en streaming. Arrête la musique précédente |
+| `stop(ch=None)` | Stoppe le canal `ch`, ou tous les canaux + musique si `ch=None` |
+| `play_pos(ch) → bool` | `True` si le canal `ch` est en train de jouer |
+
+### Détails techniques
+
+- Les sons sont **décodés en mémoire** au chargement (`miniaudio.decode_file()`) → lecture instantanée sans latence disque.
+- Chaque canal son crée son propre `miniaudio.PlaybackDevice` avec un **générateur** qui yield les trames PCM.
+- La musique est lue en **streaming** (`miniaudio.stream_file()`) pour éviter de charger des fichiers longs en mémoire.
+- Formats supportés : **WAV, MP3, FLAC, OGG**.
+- Si `miniaudio` n'est pas installé, l'audio est désactivé silencieusement (`_HAS_AUDIO = False`, toutes les méthodes sont des no-op).
+
+### Exemples
+
+```python
+# Charger des sons
+e.resources.sound(0, "./sfx/jump.wav")
+e.resources.sound(1, "./sfx/hit.wav")
+e.resources.music(0, "./music/theme.ogg")
+
+# Jouer
+e.audio.play(0, 0)              # jump sur canal 0
+e.audio.play(1, 1)              # hit sur canal 1
+e.audio.playm(0)                # musique de fond
+e.audio.play(2, 0, loop=True)   # jump en boucle sur canal 2
+
+# Vérifier
+if e.audio.play_pos(0):
+    print("Canal 0 joue encore")
+
+# Arrêter
+e.audio.stop(0)                 # stop canal 0 seulement
+e.audio.stop()                  # stop tout (canaux + musique)
+```
 
 ---
 
