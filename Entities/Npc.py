@@ -1,13 +1,18 @@
 import heapq
 import math
 
+import pygame
+
 from Engine import engine as e
 from Entities.Object import Object
 
 
 class Npc(Object):
     def __init__(
-        self, x, y, w, h, target, frames_dict, world, aggressive=True, max_health=100
+        self, x, y, w, h, target, frames_dict, world,
+        aggressive=True, max_health=100,
+        speed=0.5, detection_radius=20, attack_radius=8,
+        punch_damage=5, punch_duration=10, punch_cooldown=40,
     ):
         super().__init__(x, y, w, h, frames_dict["bank"])
         self.aggressive = aggressive
@@ -20,14 +25,21 @@ class Npc(Object):
         self.image_y = frames_dict["image_y"]
         self.is_living = True
         self.last_dir = "left"
-        self.speed = 0.5
+        self.speed = speed
         self.state = "idle"
-        self.detection_radius = 40
-        self.attack_radius = 16
+        self.detection_radius = detection_radius
+        self.attack_radius = attack_radius
         self.attack_cooldown = 0
         self.path = []
         self.path_timer = 0
-        self.path_delay = 15 # Recalculate path every 30 frames
+        self.path_delay = 15
+        self.is_punching = False
+        self.punch_timer = 0
+        self.punch_duration = punch_duration
+        self.punch_angle = 0
+        self.punch_damage = punch_damage
+        self.punch_cooldown = punch_cooldown
+        self.hit_entities = []
 
     def get_grid_pos(self, x, y):
         # We assume 8x8 grid cells for pathfinding
@@ -122,16 +134,40 @@ class Npc(Object):
         super().draw()
         if self.current_item:
             self.current_item.draw()
-            
+
+        # Draw punch arc
+        if self.is_punching:
+            progress = 1.0 - (self.punch_timer / self.punch_duration)
+            alpha = int(255 * (1.0 - progress))
+            surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+            center = (16, 16)
+            radius = 7 + progress * 3
+            points = []
+            for i in range(-80, 81, 8):
+                rad = math.radians(i) + self.punch_angle
+                px = center[0] + math.cos(rad) * radius
+                py = center[1] + math.sin(rad) * radius
+                points.append((px, py))
+            for i in range(80, -81, -8):
+                rad = math.radians(i) + self.punch_angle
+                thickness = 2.5 * math.cos(math.radians(i / 80 * 90))
+                r = radius - thickness
+                px = center[0] + math.cos(rad) * r
+                py = center[1] + math.sin(rad) * r
+                points.append((px, py))
+            if len(points) >= 3:
+                pygame.draw.polygon(surf, (255, 255, 255, alpha), points)
+            e.graphics.screen.blit(surf, (self.x + self.w/2 - 16 + e.graphics._camera_x, self.y + self.h/2 - 16 + e.graphics._camera_y))
+
         # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
-            color = (0, 255, 0,70)  # Green
+            color = (0, 255, 0,70)
         elif health_ratio > 0.3:
-            color = (255, 255, 0,70)  # Yellow
+            color = (255, 255, 0,70)
         else:
-            color = (255, 0, 0,70)  # Red
-            
+            color = (255, 0, 0,70)
+
         e.circb(int(self.x + self.w / 2), int(self.y-2), 2, color)
 
     def update(self):
@@ -165,7 +201,7 @@ class Npc(Object):
 
         # Dynamic attack radius
         current_attack_radius = self.attack_radius
-        from Entities.Crossbow import Crossbow
+        from Items.Crossbow import Crossbow
 
         if isinstance(self.current_item, Crossbow):
             current_attack_radius = 60
@@ -174,20 +210,47 @@ class Npc(Object):
             self.state = "attack" if world.active_npc is self else "idle"
             if self.state == "attack":
                 self._face_target()
-                if self.current_item and self.attack_cooldown <= 0:
-                    if hasattr(self.current_item, "slash") and not getattr(
-                        self.current_item, "is_slashing", False
-                    ):
-                        self.current_item.slash()
-                        self.attack_cooldown = 60
-                    elif hasattr(self.current_item, "fire") and not getattr(
-                        self.current_item, "is_firing", False
-                    ):
-                        angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
-                        self.current_item.fire(angle)
-                        self.attack_cooldown = 60
+                if self.attack_cooldown <= 0:
+                    if self.current_item:
+                        if hasattr(self.current_item, "slash") and not getattr(
+                            self.current_item, "is_slashing", False
+                        ):
+                            self.current_item.slash()
+                            self.attack_cooldown = getattr(self.current_item, "cooldown", 20)
+                        elif hasattr(self.current_item, "fire") and not getattr(
+                            self.current_item, "is_firing", False
+                        ):
+                            angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
+                            self.current_item.fire(angle)
+                            self.attack_cooldown = getattr(self.current_item, "cooldown", 30)
+                    elif not self.is_punching:
+                        self.is_punching = True
+                        self.punch_timer = self.punch_duration
+                        self.hit_entities = []
+                        self.punch_angle = math.atan2(
+                            self.target.y - (self.y + self.h/2),
+                            self.target.x - (self.x + self.w/2)
+                        )
+                        self.attack_cooldown = self.punch_cooldown
             if self.state == "idle":
                 self.path = []
+
+        if self.is_punching:
+            self.punch_timer -= 1
+            for entity in world.entities:
+                if entity is self or not hasattr(entity, 'take_damage'):
+                    continue
+                if not entity.is_living and not getattr(entity, 'blocking', False):
+                    continue
+                p_dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
+                if p_dist < 18 and entity not in self.hit_entities:
+                    angle_to_entity = math.atan2(entity.y + entity.h/2 - (self.y + self.h/2), entity.x + entity.w/2 - (self.x + self.w/2))
+                    angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
+                    if abs(angle_diff) < math.radians(90):
+                        self.hit_entities.append(entity)
+                        entity.take_damage(self.punch_damage, self.world)
+            if self.punch_timer <= 0:
+                self.is_punching = False
         elif self.aggressive and dist < self.detection_radius:
             self.state = "chase" if world.active_npc is self else "idle"
             if self.state == "chase":

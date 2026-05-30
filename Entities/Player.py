@@ -7,7 +7,9 @@ from Entities.Npc import Npc
 
 
 class Player(Object):
-    MAX_ITEMS = 6
+    MAX_STORAGE = 25
+    MAX_CRAFTING = 4
+    MAX_EQUIP = 2
 
     def __init__(self, x, y, w, h, bank, world=None, image_x=0, image_y=0):
         super().__init__(x, y, w, h, bank)
@@ -22,8 +24,10 @@ class Player(Object):
         self.punch_duration = 10
         self.punch_angle = 0
         self.hit_entities = []
-        self.items = [None] * self.MAX_ITEMS
-        self.current_section = 0
+        self.items = [None] * self.MAX_STORAGE
+        self.crafting = [None] * self.MAX_CRAFTING
+        self.equipment = [None, None]
+        self.current_item = None
 
     def draw(self):
         e.blt(
@@ -36,7 +40,6 @@ class Player(Object):
             8,
         )
 
-        # e.circb(self.x+3.5,self.y+7.5,4,(255,255,255))
         last_dir_dict = {"up": 6, "down": 7, "left": 5, "right": 4}
         match self.direction:
             case "idle":
@@ -56,19 +59,17 @@ class Player(Object):
         super().draw()
         if self.current_item:
             self.current_item.draw()
-            
-        # Draw health dot
+
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
-            color = (95, 255, 129,60)  # Green
+            color = (95, 255, 129, 60)
         elif health_ratio > 0.3:
-            color = (255, 255, 0,60)  # Yellow
+            color = (255, 255, 0, 60)
         else:
-            color = (255, 0, 0,60)  # Red
-            
-        e.circb(int(self.x + self.w / 2), int(self.y-1.5), 2, color)
-        
-        # Draw punch arc
+            color = (255, 0, 0, 60)
+
+        e.circb(int(self.x + self.w / 2), int(self.y - 1.5), 2, color)
+
         if self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
             alpha = int(255 * (1.0 - progress))
@@ -95,67 +96,47 @@ class Player(Object):
             if len(points) >= 3:
                 pygame.draw.polygon(surf, (255, 255, 255, alpha), points)
 
-            e.graphics.screen.blit(surf, (self.x + self.w/2 - 16 + e.graphics._camera_x, self.y + self.h/2 - 16 + e.graphics._camera_y))
+            e.graphics.screen.blit(surf, (
+                self.x + self.w / 2 - 16 + e.graphics._camera_x,
+                self.y + self.h / 2 - 16 + e.graphics._camera_y,
+            ))
 
     def update(self):
         world = self.world
         self.direction = "idle"
 
-        # Mise à jour de l'item tenu
         if self.current_item:
             self.current_item.update()
 
-        # --- Logique d'inventaire ---
-        # Ramasser (E)
         if e.btnp(e.KEY_E):
             from Entities.Item import Item
 
-            slot = next((i for i, it in enumerate(self.items) if it is None), None)
-            if slot is not None:
-                for obj in list(world.entities):
-                    if isinstance(obj, Item) and not obj.picked_up:
-                        if self.is_collid(obj):
+            for obj in list(world.entities):
+                if isinstance(obj, Item) and not obj.picked_up:
+                    if self.is_collid(obj):
+                        added = self._add_to_storage(obj)
+                        if added:
                             obj.picked_up = True
                             obj.parent = self
                             if hasattr(obj, "world"):
                                 obj.world = world
-                            self.items[slot] = obj
-                            if not self.current_item:
-                                self.current_item = obj
                             world.remove(obj)
-                            break
+                            self._sync_current_item()
+                        break
 
-        # Changer d'item (F)
-        if e.btnp(e.KEY_F) and sum(1 for it in self.items if it) > 1:
-            idx = next(i for i, it in enumerate(self.items) if it is self.current_item)
-            for offset in range(1, 7):
-                nxt = (idx + offset) % 6
-                if self.items[nxt] is not None:
-                    self.current_item = self.items[nxt]
-                    self.current_section = 0 if nxt < 3 else 1
-                    break
-
-        # Sélection directe par chiffres 1-6
-        for i in range(6):
-            key = getattr(e, f"KEY_{i + 1}", None)
-            if key and e.btnp(key) and self.items[i] is not None:
-                self.current_item = self.items[i]
-                self.current_section = 0 if i < 3 else 1
-
-        # Lâcher l'item (R)
         if e.btnp(e.KEY_R) and self.current_item:
             item_to_drop = self.current_item
+            self._remove_item(item_to_drop)
             item_to_drop.picked_up = False
             item_to_drop.parent = None
             item_to_drop.x = self.x
             item_to_drop.y = self.y
-
             world.add(item_to_drop)
-            slot = self.items.index(item_to_drop)
-            self.items[slot] = None
-            self.current_item = next((it for it in self.items if it is not None), None)
+            self._sync_current_item()
 
-        # --- Déplacement ---
+        if e.btnp(e.KEY_F):
+            self._cycle_weapon()
+
         moving = False
         dx = 0
         dy = 0
@@ -180,10 +161,8 @@ class Player(Object):
             self.last_dir = "right"
             moving = True
 
-        # Lunge effect during attack
         if not self.current_item and self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
-            # Quadratic ease-out speed
             lunge_speed = 3.5 * (1.0 - progress)
             dx += math.cos(self.punch_angle) * lunge_speed
             dy += math.sin(self.punch_angle) * lunge_speed
@@ -196,16 +175,14 @@ class Player(Object):
             else:
                 target_x = e._global_mouse_pos[0]
                 target_y = e._global_mouse_pos[1]
-                
+
             slash_angle = math.atan2(target_y - self.y, target_x - self.x)
             progress = 1.0 - (self.current_item.slash_timer / self.current_item.slash_duration)
-            # Quadratic ease-out speed
             lunge_speed = 3.5 * (1.0 - progress)
             dx += math.cos(slash_angle) * lunge_speed
             dy += math.sin(slash_angle) * lunge_speed
             moving = True
 
-        # Move X and check collision
         if dx != 0:
             self.x += dx
             for obj in world.entities:
@@ -214,7 +191,6 @@ class Player(Object):
                         self.x -= dx
                         break
 
-        # Move Y and check collision
         if dy != 0:
             self.y += dy
             for obj in world.entities:
@@ -223,7 +199,6 @@ class Player(Object):
                         self.y -= dy
                         break
 
-        # Si on ne bouge pas, on regarde vers la souris
         if not moving:
             mouse_angle = math.atan2(
                 e._global_mouse_pos[1] - self.y, e._global_mouse_pos[0] - self.x
@@ -245,16 +220,15 @@ class Player(Object):
                 spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
             except ImportError:
                 pass
-                
-        # Unarmed punch logic
+
         if not self.current_item:
             if e.mouse_btnp(e.MOUSE_BUTTON_LEFT) and not self.is_punching:
                 self.is_punching = True
                 self.punch_timer = self.punch_duration
                 self.hit_entities = []
                 self.punch_angle = math.atan2(
-                    e._global_mouse_pos[1] - (self.y + self.h/2),
-                    e._global_mouse_pos[0] - (self.x + self.w/2)
+                    e._global_mouse_pos[1] - (self.y + self.h / 2),
+                    e._global_mouse_pos[0] - (self.x + self.w / 2),
                 )
 
         if self.is_punching:
@@ -265,20 +239,84 @@ class Player(Object):
                         continue
                     if not entity.is_living and not getattr(entity, 'blocking', False):
                         continue
-                    dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
+                    dist = math.hypot(
+                        entity.x + entity.w / 2 - self.x,
+                        entity.y + entity.h / 2 - self.y,
+                    )
                     if dist < 18 and entity not in self.hit_entities:
-                            # check if the entity is within the punch angle sector
-                            angle_to_entity = math.atan2(entity.y + entity.h/2 - (self.y + self.h/2), entity.x + entity.w/2 - (self.x + self.w/2))
-                            angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
-                            if abs(angle_diff) < math.radians(90):
-                                self.hit_entities.append(entity)
-                                entity.take_damage(5, self.world)
-                                if hasattr(e, 'active_camera'):
-                                    e.active_camera.shake(3, 2)
-                                    if getattr(entity, 'is_living', False):
-                                        e.active_camera.flash((200, 220, 255), 25, 4)
+                        angle_to_entity = math.atan2(
+                            entity.y + entity.h / 2 - (self.y + self.h / 2),
+                            entity.x + entity.w / 2 - (self.x + self.w / 2),
+                        )
+                        angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
+                        if abs(angle_diff) < math.radians(90):
+                            self.hit_entities.append(entity)
+                            entity.take_damage(5, self.world)
+                            if hasattr(e, 'active_camera'):
+                                e.active_camera.shake(3, 2)
+                                if getattr(entity, 'is_living', False):
+                                    e.active_camera.flash((200, 220, 255), 25, 4)
 
             if self.punch_timer <= 0:
                 self.is_punching = False
 
         super().update()
+
+    def _add_to_storage(self, obj):
+        from Entities.Item import Item
+        from Items.Sword import Sword
+        from Items.Crossbow import Crossbow
+        if not isinstance(obj, Item):
+            return False
+
+        if isinstance(obj, Sword) and self.equipment[0] is None:
+            self.equipment[0] = obj
+            return True
+
+        if isinstance(obj, Crossbow) and self.equipment[1] is None:
+            self.equipment[1] = obj
+            return True
+
+        if obj.stackable:
+            for i, slot in enumerate(self.items):
+                if slot is not None and slot is not obj and slot.can_stack_with(obj):
+                    space = slot.stack_space()
+                    take = min(obj.quantity, space)
+                    slot.quantity += take
+                    obj.quantity -= take
+                    if obj.quantity <= 0:
+                        return True
+
+        for i, slot in enumerate(self.items):
+            if slot is None:
+                self.items[i] = obj
+                return True
+
+        return False
+
+    def _remove_item(self, item):
+        for i, it in enumerate(self.equipment):
+            if it is item:
+                self.equipment[i] = None
+                return
+        for i, it in enumerate(self.items):
+            if it is item:
+                self.items[i] = None
+                return
+        for i, it in enumerate(self.crafting):
+            if it is item:
+                self.crafting[i] = None
+                return
+
+    def _sync_current_item(self):
+        if self.equipment[0] is not None:
+            self.current_item = self.equipment[0]
+        elif self.equipment[1] is not None:
+            self.current_item = self.equipment[1]
+        else:
+            self.current_item = None
+
+    def _cycle_weapon(self):
+        if self.equipment[0] is not None and self.equipment[1] is not None:
+            self.equipment[0], self.equipment[1] = self.equipment[1], self.equipment[0]
+            self._sync_current_item()

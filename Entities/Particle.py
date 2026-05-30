@@ -55,7 +55,7 @@ def spawn_blood(x, y, world, amount=10):
         vy = math.sin(angle) * speed
         
         # Red tones
-        color = (random.randint(180, 255), 0, 0, 255)
+        color = (random.randint(180, 255), 0, 0,255)
         lifetime = random.randint(15, 30)
         
         p = Particle(x, y, vx, vy, color, lifetime, size=1)

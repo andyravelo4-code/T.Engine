@@ -11,9 +11,11 @@ class Crossbow(Item):
     """
 
     def __init__(self, x, y, w, h, bank, parent=None, world=None, damage=10,
-                 shadow_pos=(0, 0), dropped_pos=(0, 9), held_idle_pos=(0, 9), held_fire_pos=(1, 9)):
-        super().__init__(x, y, w, h, bank, parent)
-        self.world = world  # Référence au monde pour ajouter les flèches
+                 shadow_pos=(0, 0), dropped_pos=(0, 9), held_idle_pos=(0, 9), held_fire_pos=(1, 9),
+                 fire_timer=15, cooldown=30):
+        super().__init__(x, y, w, h, bank, parent,
+                         name="Arbalète", stackable=False, max_stack=1)
+        self.world = world
         self.damage = damage
         self.shadow_pos = shadow_pos
         self.dropped_pos = dropped_pos
@@ -22,7 +24,9 @@ class Crossbow(Item):
         self.rotation = 0
         self.radius = 5
         self.is_firing = False
+        self.fire_duration = fire_timer
         self.fire_timer = 0
+        self.cooldown = cooldown
 
     def update(self):
         super().update()
@@ -84,7 +88,7 @@ class Crossbow(Item):
     def fire(self, angle):
         """Crée une flèche dans le monde."""
         self.is_firing = True
-        self.fire_timer = 15
+        self.fire_timer = self.fire_duration
         if self.world:
             # On crée la flèche à la position de l'arbalète
             arrow = Arrow(self.x, self.y, angle, self.bank, world=self.world, shooter=self.parent, damage=self.damage)

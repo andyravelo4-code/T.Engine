@@ -1,8 +1,7 @@
-# Engine — Pyxel-Compatible 2D Game Engine (Pygame Backend)
+# Engine — 2D Game Engine (Pygame Backend)
 
 Un moteur de jeu 2D léger, compatible avec l'API Pyxel, construit sur **Pygame**.
-Supprime les limitations de palette et de résolution de Pyxel tout en gardant une interface similaire.
-Utilise un **écran virtuel** avec mise à l'échelle entière, un système de caméra avec shake et flash, la gestion des entrées (clavier, souris, joystick), l'audio et la gestion de ressources.
+Utilise un **écran virtuel** avec mise à l'échelle entière, un système de caméra avec shake et flash, la gestion des entrées (clavier, souris, joystick), l'audio et la gestion de ressources, supprote l'acceleration graphique .
 
 ## Utilisation minimale
 
@@ -122,7 +121,6 @@ resources.music(bank, path)               → enregistre un chemin musique
 
 - Les images sont stockées dans `resources.images[bank]`
 - Les sons dans `resources.sounds[bank]`
-- `.pyxres` non supporté
 
 ## Audio
 
