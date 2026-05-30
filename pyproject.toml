@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Tiavina.engine.gl"
-version = "0.1.0"
+version = "0.2.0"
 description = "Moteur de jeu 2D sur PyOpenGL (GLFW + Pillow)"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -13,6 +13,7 @@ dependencies = [
     "PyOpenGL>=3.1",
     "glfw>=2.5",
     "Pillow>=9.0",
+    "miniaudio>=1.71",
 ]
 keywords = ["game", "engine", "opengl", "2d", "pixel"]
 classifiers = [

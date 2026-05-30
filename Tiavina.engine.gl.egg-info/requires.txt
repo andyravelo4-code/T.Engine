@@ -1,3 +1,4 @@
 PyOpenGL>=3.1
 glfw>=2.5
 Pillow>=9.0
+miniaudio>=1.71

@@ -14,6 +14,13 @@ import glfw
 from OpenGL.GL import *
 from PIL import Image, ImageDraw, ImageFont
 
+try:
+    import miniaudio
+    _HAS_AUDIO = True
+except Exception:
+    miniaudio = None
+    _HAS_AUDIO = False
+
 # ----------------------------------------------------------------------
 # Constantes de touches (GLFW)
 # ----------------------------------------------------------------------
@@ -377,9 +384,16 @@ class Resources:
             return None
 
     def sound(self, bank, sound_path):
-        print(f"Son non implémenté (OpenGL): {sound_path}")
-        self.sounds[bank] = None
-        return None
+        if not _HAS_AUDIO:
+            print(f"Audio non disponible — son ignoré: {sound_path}")
+            return None
+        try:
+            decoded = miniaudio.decode_file(sound_path)
+            self.sounds[bank] = decoded
+            return decoded
+        except Exception as e:
+            print(f"Erreur chargement son {sound_path}: {e}")
+            return None
 
     def music(self, bank, music_path):
         self.musics[bank] = music_path
@@ -389,23 +403,97 @@ class Resources:
 
 
 # ----------------------------------------------------------------------
-# Audio (stub – pas de dépendance audio)
+# Audio (via miniaudio)
 # ----------------------------------------------------------------------
+def _sound_generator(samples, nchannels, fmt, loop, done):
+    """Génère des trames PCM. `done` est une liste [bool] mise à True quand le son finit."""
+    bytes_per_sample = 2
+    if fmt in (miniaudio.SampleFormat.FLOAT32, miniaudio.SampleFormat.SIGNED32):
+        bytes_per_sample = 4
+    pos = 0
+    frames_needed = 1024
+    while True:
+        avail = (len(samples) - pos) // nchannels
+        if avail <= 0:
+            if loop:
+                pos = 0
+                avail = len(samples) // nchannels
+            else:
+                done[0] = True
+                return
+        take = min(frames_needed, avail)
+        chunk = samples[pos:pos + take * nchannels]
+        pos += take * nchannels
+        frames_needed = yield bytes(chunk)
+
+
 class Audio:
     def __init__(self):
         self.sounds = {}
         self.musics = {}
+        self._devices = [None] * 8
+        self._music_device = None
+        self._done_flags = [[False] for _ in range(8)]
 
     def play(self, ch, s, loop=False):
-        pass
+        if not _HAS_AUDIO or ch >= 8 or s not in self.sounds:
+            return
+        self.stop(ch)
+        sf = self.sounds[s]
+        self._done_flags[ch][0] = False
+        gen = _sound_generator(sf.samples, sf.nchannels,
+                               sf.sample_format, loop,
+                               self._done_flags[ch])
+        next(gen)
+        try:
+            dev = miniaudio.PlaybackDevice(
+                output_format=sf.sample_format,
+                nchannels=sf.nchannels,
+                sample_rate=sf.sample_rate,
+            )
+            dev.start(gen)
+            self._devices[ch] = dev
+        except Exception as e:
+            print(f"Erreur lecture son canal {ch}: {e}")
 
     def playm(self, m, loop=False):
-        pass
+        if not _HAS_AUDIO or m not in self.musics:
+            return
+        self._stop_music()
+        path = self.musics[m]
+        try:
+            gen = miniaudio.stream_file(path)
+            next(gen)
+            dev = miniaudio.PlaybackDevice()
+            dev.start(gen)
+            self._music_device = dev
+        except Exception as e:
+            print(f"Erreur lecture musique {m}: {e}")
 
     def stop(self, ch=None):
-        pass
+        if ch is None:
+            for i in range(8):
+                self.stop(i)
+            self._stop_music()
+        elif ch < 8 and self._devices[ch]:
+            try:
+                self._devices[ch].close()
+            except Exception:
+                pass
+            self._devices[ch] = None
+            self._done_flags[ch][0] = True
+
+    def _stop_music(self):
+        if self._music_device:
+            try:
+                self._music_device.close()
+            except Exception:
+                pass
+            self._music_device = None
 
     def play_pos(self, ch):
+        if ch < 8:
+            return not self._done_flags[ch][0]
         return False
 
 
@@ -958,6 +1046,8 @@ class App:
         self.graphics = Graphics(width, height, display_scale, pixel_art)
         self.audio = Audio()
         self.resources = Resources()
+        self.audio.sounds = self.resources.sounds
+        self.audio.musics = self.resources.musics
 
     def run(self, update, draw):
         self.running = True
