@@ -166,6 +166,7 @@ class Graphics:
         self._clip_rect = None
         self._camera_x = 0
         self._camera_y = 0
+        self._default_font = None
 
     def _has_alpha(self, color):
         return isinstance(color, (tuple, list)) and len(color) == 4
@@ -274,8 +275,11 @@ class Graphics:
         self._draw_with_alpha(_draw_trib, color)
 
     def text(self, x, y, s, color, font=None):
-        font = font or pygame.font.Font(None, 16)
-        surf = font.render(s, True, color)
+        if font is None:
+            if self._default_font is None:
+                self._default_font = default_font(6)
+            font = self._default_font
+        surf = font.render(s, False, color)
         self.screen.blit(surf, (x + self._camera_x, y + self._camera_y))
 
     def blt(self, x, y, img, u, v, w, h, colkey=None, rotate=0):
@@ -644,6 +648,18 @@ def btnp(key, hold=0, period=0):
 
 def btnr(key):
     return input.btnr(key) if input else False
+
+
+# Police pixel art par défaut
+_pixel_font_cache = {}
+
+def default_font(size=6):
+    if size not in _pixel_font_cache:
+        try:
+            _pixel_font_cache[size] = pygame.font.Font("assests/fonts/PressStart2P.ttf", size)
+        except pygame.error:
+            _pixel_font_cache[size] = pygame.font.Font(None, size)
+    return _pixel_font_cache[size]
 
 
 # Constantes de touches (pygame)

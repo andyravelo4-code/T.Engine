@@ -4,6 +4,16 @@ from Engine import engine
 from Entities.Block import Block
 
 
+class FloatingText:
+    def __init__(self, x, y, text, color, lifetime):
+        self.x = x
+        self.y = y
+        self.text = text
+        self.color = color
+        self.lifetime = lifetime
+        self.max_lifetime = lifetime
+
+
 class World:
     """
     Conteneur global pour toutes les entités du jeu.
@@ -13,6 +23,10 @@ class World:
     def __init__(self):
         self.entities = []
         self.active_npc = None
+        self.floating_texts = []
+
+    def add_floating_text(self, x, y, text, color, lifetime):
+        self.floating_texts.append(FloatingText(x, y, text, color, lifetime))
 
     def add(self, entity):
         """Ajoute une entité au monde."""
@@ -56,6 +70,12 @@ class World:
             if hasattr(entity, "lifetime") and entity.lifetime <= 0:
                 self.remove(entity)
 
+        for ft in list(self.floating_texts):
+            ft.y -= 0.3
+            ft.lifetime -= 1
+            if ft.lifetime <= 0:
+                self.floating_texts.remove(ft)
+
     def draw(self):
         """Dessine d'abord les blocs (fond), puis les entités triées par y."""
         blocks = [e for e in self.entities if isinstance(e, Block)]
@@ -64,4 +84,12 @@ class World:
             e.draw()
         for e in sorted(others, key=lambda e: e.y):
             e.draw()
+
+        for ft in self.floating_texts:
+            font = engine.default_font(6)
+            surf = font.render(ft.text, False, ft.color[:3])
+            surf.set_alpha(int(255 * ft.lifetime / ft.max_lifetime))
+            engine.graphics.screen.blit(surf,
+                (ft.x + engine.graphics._camera_x - surf.get_width() // 2,
+                 ft.y + engine.graphics._camera_y))
         

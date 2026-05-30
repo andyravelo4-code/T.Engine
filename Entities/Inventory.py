@@ -138,10 +138,13 @@ class Inventory:
         elif btnr and self.hovered >= 0 and self.drag_qty > 0:
             self._place_drag(self.hovered, shiftp)
 
-        # Right-click split
+        # Right-click consumable use
         if rbtnp and self.drag_qty == 0 and self.hovered >= 0:
             slot_item, slot_qty = self._slot_get(self.hovered)
-            if slot_item is not None and slot_qty > 1:
+            from Items.Consumable import Consumable
+            if isinstance(slot_item, Consumable):
+                self._use_consumable(slot_item, self.hovered)
+            elif slot_item is not None and slot_qty > 1:
                 half = slot_qty // 2
                 self.drag_item = slot_item
                 self.drag_qty = half
@@ -281,8 +284,8 @@ class Inventory:
                 item.w, item.h,
             )
             if qty > 1:
-                ts = pygame.font.Font(None, 14)
-                tsurf = ts.render(str(qty), True, (255, 255, 255))
+                ts = e.default_font(6)
+                tsurf = ts.render(str(qty), False, (255, 255, 255))
                 e.graphics.screen.blit(tsurf, (x + w - tsurf.get_width() - 1, y + 1))
         else:
             bg = self.SLOT_EQ if is_equip else self.SLOT_E
@@ -309,8 +312,8 @@ class Inventory:
             self.drag_item.w, self.drag_item.h,
         )
         if self.drag_qty > 1:
-            ts = pygame.font.Font(None, 14)
-            tsurf = ts.render(str(self.drag_qty), True, (255, 255, 255))
+            ts = e.default_font(6)
+            tsurf = ts.render(str(self.drag_qty), False, (255, 255, 255))
             e.graphics.screen.blit(tsurf, (mx + 2, my - 6))
 
     def _draw_tooltip(self, mx, my):
@@ -319,13 +322,13 @@ class Inventory:
         item, qty = self._slot_get(self.hovered)
         if item is None:
             return
-        font = pygame.font.Font(None, 14)
+        font = e.default_font(6)
         label = item.name
         if self._eq_start <= self.hovered < self._eq_end:
             label += " (équipé)"
         if qty > 1:
             label += f" x{qty}"
-        ts = font.render(label, True, (255, 255, 255))
+        ts = font.render(label, False, (255, 255, 255))
         tw, th = ts.get_size()
         tx = min(mx + 8, e.width() - tw - 4)
         ty = max(my - th - 4, 0)
@@ -435,6 +438,12 @@ class Inventory:
                     if space > 0:
                         return self._st_start + i
         return self._find_storage_empty()
+
+    def _use_consumable(self, item, slot_idx):
+        old_qty = item.quantity
+        item.use(self.player, self)
+        if item.quantity <= 0 < old_qty:
+            self._slot_set(slot_idx, None, 0)
 
     def _drop_drag(self):
         if self.drag_item and self.drag_qty > 0:

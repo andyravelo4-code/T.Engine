@@ -6,6 +6,7 @@ from Entities.Map import Map
 from Entities.Inventory import Inventory
 from Items.Sword import Sword
 from Items.Crossbow import Crossbow
+from Items.Consumable import Consumable
 
 MAP_MODE = "island"     # "single" (dungeon/cave/island), "island" (noise+biomes), "surface" (noise+biomes), "multi" (stripes)
 MAP_BIOME = "dungeon"   # used when MAP_MODE is "single"
@@ -51,6 +52,7 @@ if MAP_MODE == "single":
         item_configs=[
             {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
             {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )
 elif MAP_MODE == "island":
@@ -64,6 +66,7 @@ elif MAP_MODE == "island":
         item_configs=[
             {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
             {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )
 elif MAP_MODE == "surface":
@@ -77,6 +80,7 @@ elif MAP_MODE == "surface":
         item_configs=[
             {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
             {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )
 elif MAP_MODE == "multi":
@@ -90,6 +94,7 @@ elif MAP_MODE == "multi":
         item_configs=[
             {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
             {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )
 bg_color = game_map.bg_color

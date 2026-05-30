@@ -91,6 +91,18 @@ def spawn_hit(x, y, world, amount=5):
         world.add(p)
 
 
+def spawn_heal(x, y, world, amount=6):
+    for _ in range(amount):
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(0.5, 1.5)
+        vx = math.cos(angle) * speed
+        vy = math.sin(angle) * speed - 0.5
+        color = (100, 255, 100, 200)
+        lifetime = random.randint(15, 25)
+        p = Particle(x, y, vx, vy, color, lifetime, size=random.randint(1, 2))
+        world.add(p)
+
+
 def spawn_bones(x, y, world, amount=4):
     for _ in range(amount):
         angle = random.uniform(0, 2 * math.pi)
