@@ -1,3 +1,28 @@
+Metadata-Version: 2.4
+Name: T.engine
+Version: 0.1.0
+Summary: Moteur de jeu 2D sur Pygame
+License-Expression: GPL-3.0-only
+Project-URL: Homepage, https://github.com/andyravelo4-code/
+Project-URL: Source, https://github.com/andyravelo4-code/T.Engine
+Keywords: game,engine,pygame,2d,pixel
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Topic :: Games/Entertainment
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pygame>=2.0.0
+Dynamic: license-file
+
 # T.engine
 
 Moteur de jeu 2D pixel art, construit sur **Pygame**.  
