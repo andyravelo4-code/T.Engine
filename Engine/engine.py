@@ -9,6 +9,7 @@ import pathlib
 import random
 import sys
 from array import array
+import ctypes
 
 import glfw
 from OpenGL.GL import *
@@ -498,7 +499,218 @@ class Audio:
 
 
 # ----------------------------------------------------------------------
-# Graphiques (OpenGL)
+# Vertex batches (VBO — remplace glBegin/glEnd)
+# ----------------------------------------------------------------------
+class _FillBatch:
+    """Batch de triangles pleins (GL_TRIANGLES) avec VBO."""
+    def __init__(self):
+        self._vbo = glGenBuffers(1)
+        self.clear()
+
+    def clear(self):
+        self._data = []
+        self._count = 0
+
+    def _push(self, x, y, c):
+        self._data.extend((x, y, c[0], c[1], c[2], c[3]))
+        self._count += 1
+
+    def quad(self, x, y, w, h, color):
+        c = _norm_color(color)
+        self._push(x, y, c)
+        self._push(x + w, y, c)
+        self._push(x, y + h, c)
+        self._push(x + w, y, c)
+        self._push(x + w, y + h, c)
+        self._push(x, y + h, c)
+
+    def triangle(self, x1, y1, x2, y2, x3, y3, color):
+        c = _norm_color(color)
+        self._push(x1, y1, c)
+        self._push(x2, y2, c)
+        self._push(x3, y3, c)
+
+    def circ_filled(self, cx, cy, r, color):
+        c = _norm_color(color)
+        segs = max(8, int(r * 2))
+        if segs < 3:
+            self._push(cx, cy, c)
+            return
+        step = 2.0 * math.pi / segs
+        for i in range(segs):
+            a1 = step * i
+            a2 = step * (i + 1)
+            self._push(cx, cy, c)
+            self._push(cx + r * math.cos(a1), cy + r * math.sin(a1), c)
+            self._push(cx + r * math.cos(a2), cy + r * math.sin(a2), c)
+
+    def elli_filled(self, cx, cy, rx, ry, color):
+        c = _norm_color(color)
+        segs = max(8, int((rx + ry) / 2))
+        if segs < 3:
+            self._push(cx, cy, c)
+            return
+        step = 2.0 * math.pi / segs
+        for i in range(segs):
+            a1 = step * i
+            a2 = step * (i + 1)
+            self._push(cx, cy, c)
+            self._push(cx + rx * math.cos(a1), cy + ry * math.sin(a1), c)
+            self._push(cx + rx * math.cos(a2), cy + ry * math.sin(a2), c)
+
+    def flush(self):
+        if self._count == 0:
+            return
+        glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
+        arr = array('f', self._data)
+        glBufferData(GL_ARRAY_BUFFER, arr.tobytes(), GL_DYNAMIC_DRAW)
+        glEnableClientState(GL_VERTEX_ARRAY)
+        glEnableClientState(GL_COLOR_ARRAY)
+        stride = 24
+        glVertexPointer(2, GL_FLOAT, stride, ctypes.c_void_p(0))
+        glColorPointer(4, GL_FLOAT, stride, ctypes.c_void_p(8))
+        glDisable(GL_TEXTURE_2D)
+        glDrawArrays(GL_TRIANGLES, 0, self._count)
+        glDisableClientState(GL_VERTEX_ARRAY)
+        glDisableClientState(GL_COLOR_ARRAY)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        self.clear()
+
+    def destroy(self):
+        glDeleteBuffers(1, [self._vbo])
+
+
+class _LineBatch:
+    """Batch de lignes (GL_LINES) avec VBO."""
+    def __init__(self):
+        self._vbo = glGenBuffers(1)
+        self.clear()
+
+    def clear(self):
+        self._data = []
+        self._count = 0
+
+    def _push(self, x, y, c):
+        self._data.extend((x, y, c[0], c[1], c[2], c[3]))
+        self._count += 1
+
+    def line(self, x1, y1, x2, y2, color):
+        c = _norm_color(color)
+        self._push(x1, y1, c)
+        self._push(x2, y2, c)
+
+    def loop(self, points, color):
+        c = _norm_color(color)
+        n = len(points)
+        if n < 2:
+            return
+        for i in range(n):
+            x1, y1 = points[i]
+            x2, y2 = points[(i + 1) % n]
+            self._push(x1, y1, c)
+            self._push(x2, y2, c)
+
+    def flush(self, line_width=1.0):
+        if self._count == 0:
+            return
+        glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
+        arr = array('f', self._data)
+        glBufferData(GL_ARRAY_BUFFER, arr.tobytes(), GL_DYNAMIC_DRAW)
+        glEnableClientState(GL_VERTEX_ARRAY)
+        glEnableClientState(GL_COLOR_ARRAY)
+        stride = 24
+        glVertexPointer(2, GL_FLOAT, stride, ctypes.c_void_p(0))
+        glColorPointer(4, GL_FLOAT, stride, ctypes.c_void_p(8))
+        glDisable(GL_TEXTURE_2D)
+        if line_width > 1.0:
+            glLineWidth(line_width)
+        glDrawArrays(GL_LINES, 0, self._count)
+        if line_width > 1.0:
+            glLineWidth(1.0)
+        glDisableClientState(GL_VERTEX_ARRAY)
+        glDisableClientState(GL_COLOR_ARRAY)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        self.clear()
+
+    def destroy(self):
+        glDeleteBuffers(1, [self._vbo])
+
+
+# ----------------------------------------------------------------------
+# Font Atlas (bitmap — plus de PIL dans la boucle de rendu)
+# ----------------------------------------------------------------------
+class _FontAtlas:
+    def __init__(self, font_wrap):
+        self._font = font_wrap
+        self._glyphs = {}
+        self._tex_id = 0
+        if font_wrap is not None:
+            self._build()
+
+    def _build(self):
+        dummy = Image.new('RGBA', (1, 1))
+        dr = ImageDraw.Draw(dummy)
+        bb = dr.textbbox((0, 0), 'W', font=self._font.font)
+        cell_w = max(1, bb[2] - bb[0] + 1)
+        cell_h = max(1, bb[3] - bb[1])
+
+        cols = 16
+        pad = 1
+        atlas_w = cols * (cell_w + pad) + pad
+        atlas_h = 6 * (cell_h + pad) + pad
+        atlas = Image.new('RGBA', (atlas_w, atlas_h), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(atlas)
+
+        for i, code in enumerate(range(32, 128)):
+            col = i % cols
+            row = i // cols
+            gx = pad + col * (cell_w + pad)
+            gy = pad + row * (cell_h + pad)
+            ch = chr(code)
+            bb2 = dr.textbbox((0, 0), ch, font=self._font.font)
+            cw = max(1, bb2[2] - bb2[0])
+            dr.text((gx, gy), ch, font=self._font.font, fill=(255, 255, 255))
+            self._glyphs[code] = (gx, gy, cw, cell_h)
+
+        r, g, b, a = atlas.split()
+        a = a.point(lambda x: 255 if x > 127 else 0)
+        atlas = Image.merge('RGBA', (r, g, b, a))
+
+        self._tex_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self._tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas.width, atlas.height,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, atlas.tobytes())
+        self._tex_w = atlas_w
+        self._tex_h = atlas_h
+
+    def render(self, dx, dy, s, color):
+        glBindTexture(GL_TEXTURE_2D, self._tex_id)
+        x = dx
+        for ch in s:
+            code = ord(ch)
+            if code < 32 or code > 126:
+                code = 32
+            gx, gy, gw, gh = self._glyphs.get(code, self._glyphs[32])
+            u1 = gx / self._tex_w
+            v1 = gy / self._tex_h
+            u2 = (gx + gw) / self._tex_w
+            v2 = (gy + gh) / self._tex_h
+            glBegin(GL_QUADS)
+            glColor4f(*color)
+            glTexCoord2f(u1, v1); glVertex2f(x, dy)
+            glTexCoord2f(u2, v1); glVertex2f(x + gw, dy)
+            glTexCoord2f(u2, v2); glVertex2f(x + gw, dy + gh)
+            glTexCoord2f(u1, v2); glVertex2f(x, dy + gh)
+            glEnd()
+            x += gw
+
+
+# ----------------------------------------------------------------------
+# Graphiques (OpenGL + VBO + Font Atlas)
 # ----------------------------------------------------------------------
 class Graphics:
     def __init__(self, width, height, display_scale, pixel_art=True):
@@ -509,16 +721,15 @@ class Graphics:
         self._camera_x = 0
         self._camera_y = 0
         self._clip_rect = None
-        self._default_font = None
         self._font_wrap = None
-        self._tex_cache = {}       # id(_Img) -> bool (uploaded)
-        self._colkey_cache = {}    # (img_id, u, v, w, h, colkey) -> tex_id
-        self._circle_cache = {}    # radius -> (display list | vertices)
+        self._font_atlas = None
+        self._tex_cache = {}
+        self._colkey_cache = {}
 
-        # Écran de compatibilité
+        self._fill = _FillBatch()
+        self._lines = _LineBatch()
         self.screen = _Screen(width, height)
 
-        # Projection
         glViewport(0, 0, width * display_scale, height * display_scale)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
@@ -541,9 +752,8 @@ class Graphics:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        data = pil_img.tobytes()
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pil_img.width, pil_img.height,
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, pil_img.tobytes())
         return tex
 
     def _tex_of(self, img):
@@ -558,70 +768,21 @@ class Graphics:
             return tid, img.width, img.height
         return 0, 0, 0
 
-    # --- Primitives ---
-    def _draw_quad(self, x, y, w, h, color):
-        if self._pixel_art:
-            x = round(x)
-            y = round(y)
-            w = round(w)
-            h = round(h)
-        x += self._camera_x
-        y += self._camera_y
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        glBegin(GL_QUADS)
-        glVertex2f(x, y)
-        glVertex2f(x + w, y)
-        glVertex2f(x + w, y + h)
-        glVertex2f(x, y + h)
-        glEnd()
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
-
-    def _draw_outline(self, x, y, w, h, color):
-        if self._pixel_art:
-            x = round(x)
-            y = round(y)
-            w = round(w)
-            h = round(h)
-        x += self._camera_x
-        y += self._camera_y
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        if self._pixel_art:
-            glLineWidth(self._scale)
-        glBegin(GL_LINE_LOOP)
-        glVertex2f(x, y)
-        glVertex2f(x + w, y)
-        glVertex2f(x + w, y + h)
-        glVertex2f(x, y + h)
-        glEnd()
-        if self._pixel_art:
-            glLineWidth(1.0)
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+    # --- Primitives (accumulées dans les batches) ---
+    def _r(self, *args):
+        if not self._pixel_art:
+            return args if len(args) > 1 else args[0]
+        return tuple(round(v) for v in args)
 
     def cls(self, color):
+        self.flush()
         c = _norm_color(color)
         glClearColor(c[0], c[1], c[2], 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
     def pset(self, x, y, color):
-        x += self._camera_x
-        y += self._camera_y
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        glBegin(GL_QUADS)
-        glVertex2f(x, y)
-        glVertex2f(x + 1, y)
-        glVertex2f(x + 1, y + 1)
-        glVertex2f(x, y + 1)
-        glEnd()
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        x, y = self._r(x, y)
+        self._fill.quad(x + self._camera_x, y + self._camera_y, 1, 1, color)
 
     def pget(self, x, y):
         x += self._camera_x
@@ -633,161 +794,79 @@ class Graphics:
         return (0, 0, 0, 0)
 
     def line(self, x1, y1, x2, y2, color):
-        if self._pixel_art:
-            x1 = round(x1)
-            y1 = round(y1)
-            x2 = round(x2)
-            y2 = round(y2)
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        if self._pixel_art:
-            glLineWidth(self._scale)
-        glBegin(GL_LINES)
-        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
-        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
-        glEnd()
-        if self._pixel_art:
-            glLineWidth(1.0)
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        x1, y1, x2, y2 = self._r(x1, y1, x2, y2)
+        self._lines.line(x1 + self._camera_x, y1 + self._camera_y,
+                         x2 + self._camera_x, y2 + self._camera_y, color)
 
     def rect(self, x, y, w, h, color):
-        self._draw_quad(x, y, w, h, color)
+        x, y, w, h = self._r(x, y, w, h)
+        self._fill.quad(x + self._camera_x, y + self._camera_y, w, h, color)
 
     def rectb(self, x, y, w, h, color):
-        self._draw_outline(x, y, w, h, color)
+        x, y, w, h = self._r(x, y, w, h)
+        cx, cy = x + self._camera_x, y + self._camera_y
+        self._lines.loop([(cx, cy), (cx + w, cy),
+                          (cx + w, cy + h), (cx, cy + h)], color)
 
     def circ(self, x, y, r, color):
-        if self._pixel_art:
-            x = round(x)
-            y = round(y)
-            r = round(r)
-        cx = x + self._camera_x
-        cy = y + self._camera_y
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        segs = max(8, int(r * 2))
-        glBegin(GL_TRIANGLE_FAN)
-        glVertex2f(cx, cy)
-        for i in range(segs + 1):
-            a = 2.0 * 3.14159265 * i / segs
-            glVertex2f(cx + r * math.cos(a),
-                       cy + r * math.sin(a))
-        glEnd()
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        x, y, r = self._r(x, y, r)
+        self._fill.circ_filled(x + self._camera_x, y + self._camera_y, r, color)
 
     def circb(self, x, y, r, color):
-        if self._pixel_art:
-            x = round(x)
-            y = round(y)
-            r = round(r)
-        cx = x + self._camera_x
-        cy = y + self._camera_y
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
+        x, y, r = self._r(x, y, r)
+        cx, cy = x + self._camera_x, y + self._camera_y
         segs = max(8, int(r * 2))
-        glBegin(GL_LINE_LOOP)
-        for i in range(segs):
-            a = 2.0 * 3.14159265 * i / segs
-            glVertex2f(cx + r * math.cos(a),
-                       cy + r * math.sin(a))
-        glEnd()
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        pts = [(cx + r * math.cos(2 * math.pi * i / segs),
+                cy + r * math.sin(2 * math.pi * i / segs)) for i in range(segs)]
+        self._lines.loop(pts, color)
 
     def elli(self, x, y, w, h, color):
-        if self._pixel_art:
-            x = round(x)
-            y = round(y)
-            w = round(w)
-            h = round(h)
-        cx = x + self._camera_x + w / 2
-        cy = y + self._camera_y + h / 2
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        segs = max(8, int((w + h) / 2))
-        glBegin(GL_TRIANGLE_FAN)
-        glVertex2f(cx, cy)
-        for i in range(segs + 1):
-            a = 2.0 * 3.14159265 * i / segs
-            glVertex2f(cx + w / 2 * math.cos(a),
-                       cy + h / 2 * math.sin(a))
-        glEnd()
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        x, y, w, h = self._r(x, y, w, h)
+        cx, cy = x + self._camera_x + w / 2, y + self._camera_y + h / 2
+        self._fill.elli_filled(cx, cy, w / 2, h / 2, color)
 
     def ellib(self, x, y, w, h, color):
-        if self._pixel_art:
-            x = round(x)
-            y = round(y)
-            w = round(w)
-            h = round(h)
-        cx = x + self._camera_x + w / 2
-        cy = y + self._camera_y + h / 2
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
+        x, y, w, h = self._r(x, y, w, h)
+        cx, cy = x + self._camera_x + w / 2, y + self._camera_y + h / 2
         segs = max(8, int((w + h) / 2))
-        glBegin(GL_LINE_LOOP)
-        for i in range(segs):
-            a = 2.0 * 3.14159265 * i / segs
-            glVertex2f(cx + w / 2 * math.cos(a),
-                       cy + h / 2 * math.sin(a))
-        glEnd()
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        pts = [(cx + w / 2 * math.cos(2 * math.pi * i / segs),
+                cy + h / 2 * math.sin(2 * math.pi * i / segs)) for i in range(segs)]
+        self._lines.loop(pts, color)
 
     def tri(self, x1, y1, x2, y2, x3, y3, color):
-        if self._pixel_art:
-            x1 = round(x1); y1 = round(y1)
-            x2 = round(x2); y2 = round(y2)
-            x3 = round(x3); y3 = round(y3)
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        glBegin(GL_TRIANGLES)
-        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
-        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
-        glVertex2f(x3 + self._camera_x, y3 + self._camera_y)
-        glEnd()
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        x1, y1, x2, y2, x3, y3 = self._r(x1, y1, x2, y2, x3, y3)
+        self._fill.triangle(x1 + self._camera_x, y1 + self._camera_y,
+                            x2 + self._camera_x, y2 + self._camera_y,
+                            x3 + self._camera_x, y3 + self._camera_y, color)
 
     def trib(self, x1, y1, x2, y2, x3, y3, color):
-        if self._pixel_art:
-            x1 = round(x1); y1 = round(y1)
-            x2 = round(x2); y2 = round(y2)
-            x3 = round(x3); y3 = round(y3)
-        c = _norm_color(color)
-        glDisable(GL_TEXTURE_2D)
-        glColor4f(*c)
-        if self._pixel_art:
-            glLineWidth(self._scale)
-        glBegin(GL_LINE_LOOP)
-        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
-        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
-        glVertex2f(x3 + self._camera_x, y3 + self._camera_y)
-        glEnd()
-        if self._pixel_art:
-            glLineWidth(1.0)
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1, 1, 1, 1)
+        x1, y1, x2, y2, x3, y3 = self._r(x1, y1, x2, y2, x3, y3)
+        cx1, cy1 = x1 + self._camera_x, y1 + self._camera_y
+        cx2, cy2 = x2 + self._camera_x, y2 + self._camera_y
+        cx3, cy3 = x3 + self._camera_x, y3 + self._camera_y
+        self._lines.loop([(cx1, cy1), (cx2, cy2), (cx3, cy3)], color)
 
-    # --- Texte ---
+    # --- Texte (Font Atlas) ---
     def text(self, x, y, s, color, font=None):
         if font is None:
-            if self._font_wrap is None:
+            if self._font_atlas is None:
                 self._font_wrap = default_font(6)
-            font = self._font_wrap
-        elif not isinstance(font, _FontWrap):
-            font = _FontWrap(font, 6)
+                self._font_atlas = _FontAtlas(self._font_wrap)
+            atlas = self._font_atlas
+        elif isinstance(font, _FontWrap) and hasattr(font, '_atlas'):
+            atlas = font._atlas
+        else:
+            self._legacy_text(x, y, s, color, font)
+            return
+        self._fill.flush()
+        self._lines.flush()
+        c = _norm_color(color)
+        glEnable(GL_TEXTURE_2D)
+        atlas.render(x + self._camera_x, y + self._camera_y, s, c)
+        glColor4f(1, 1, 1, 1)
 
-        dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+    def _legacy_text(self, x, y, s, color, font):
+        dummy = Image.new('RGBA', (1, 1))
         dr = ImageDraw.Draw(dummy)
         bb = dr.textbbox((0, 0), s, font=font.font)
         tw = max(1, bb[2] - bb[0])
@@ -795,15 +874,12 @@ class Graphics:
         img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
         dr = ImageDraw.Draw(img)
         dr.text((0, 0), s, font=font.font, fill=color)
-        # PIL TrueType always anti-aliases; threshold alpha for crisp pixel font
         r, g, b, a = img.split()
         a = a.point(lambda x: 255 if x > 127 else 0)
         img = Image.merge('RGBA', (r, g, b, a))
-
         tex = self._upload_tex(img)
         dx = x + self._camera_x
         dy = y + self._camera_y
-
         glBindTexture(GL_TEXTURE_2D, tex)
         glBegin(GL_QUADS)
         glTexCoord2f(0, 0); glVertex2f(dx, dy)
@@ -813,14 +889,12 @@ class Graphics:
         glEnd()
         glDeleteTextures(1, [tex])
 
-    # --- Blit (sprite) ---
+    # --- Blit ---
     def blt(self, x, y, img, u, v, w, h, colkey=None, rotate=0):
         dx = x + self._camera_x
         dy = y + self._camera_y
 
-        # Rotation path: use PIL rotation like pygame.transform.rotate()
         if rotate != 0:
-            # Extract sub-image from source
             if isinstance(img, _Img):
                 pil_src = img._pil
             elif isinstance(img, Image.Image):
@@ -829,8 +903,6 @@ class Graphics:
                 return
             sub = pil_src.crop((u, v, u + w, v + h))
             sub = sub.rotate(rotate, expand=True, resample=Image.NEAREST)
-
-            # Apply colkey if needed
             if colkey is not None:
                 if isinstance(colkey, int):
                     ck = (colkey & 0xFF, (colkey >> 8) & 0xFF, (colkey >> 16) & 0xFF)
@@ -846,17 +918,16 @@ class Graphics:
                             match = p[:3] == ck
                         if match:
                             data[px, py] = (0, 0, 0, 0)
-
+            self._fill.flush()
+            self._lines.flush()
             tex_id = self._upload_tex(sub)
             glBindTexture(GL_TEXTURE_2D, tex_id)
-
-            # Center the rotated surface on original center (like pygame)
+            glEnable(GL_TEXTURE_2D)
             sw, sh = sub.size
             cx = dx + w / 2
             cy = dy + h / 2
             sx = cx - sw / 2
             sy = cy - sh / 2
-
             glBegin(GL_QUADS)
             glTexCoord2f(0, 0); glVertex2f(sx, sy)
             glTexCoord2f(1, 0); glVertex2f(sx + sw, sy)
@@ -866,7 +937,6 @@ class Graphics:
             glDeleteTextures(1, [tex_id])
             return
 
-        # Non-rotated path (unchanged)
         if colkey is not None and isinstance(img, _Img):
             if isinstance(colkey, int):
                 ck = (colkey & 0xFF, (colkey >> 8) & 0xFF, (colkey >> 16) & 0xFF)
@@ -888,11 +958,9 @@ class Graphics:
                             data[px, py] = (0, 0, 0, 0)
                 tid = self._upload_tex(sub)
                 self._colkey_cache[key] = tid
-            tex_id, iw, ih = tid, w, h
-            tu1 = 0
-            tv1 = 0
-            tu2 = 1
-            tv2 = 1
+            tex_id = tid
+            tu1 = tv1 = 0
+            tu2 = tv2 = 1
         else:
             tex_id, iw, ih = self._tex_of(img)
             tu1 = u / iw if iw > 0 else 0
@@ -900,7 +968,10 @@ class Graphics:
             tu2 = (u + w) / iw if iw > 0 else 1
             tv2 = (v + h) / ih if ih > 0 else 1
 
+        self._fill.flush()
+        self._lines.flush()
         glBindTexture(GL_TEXTURE_2D, tex_id)
+        glEnable(GL_TEXTURE_2D)
         glBegin(GL_QUADS)
         glTexCoord2f(tu1, tv1); glVertex2f(dx, dy)
         glTexCoord2f(tu2, tv1); glVertex2f(dx + w, dy)
@@ -917,11 +988,8 @@ class Graphics:
             self._clip_rect = None
         else:
             glEnable(GL_SCISSOR_TEST)
-            sx = int(x)
-            sy = int(self._h * self._scale - (y + h))
-            sw = int(w)
-            sh = int(h)
-            glScissor(sx, sy, sw, sh)
+            glScissor(int(x), int(self._h * self._scale - (y + h)),
+                      int(w), int(h))
             self._clip_rect = (x, y, w, h)
 
     def camera(self, x=None, y=None):
@@ -930,10 +998,15 @@ class Graphics:
             self._camera_y = 0
         else:
             if self._pixel_art:
-                x = round(x)
-                y = round(y)
+                x, y = self._r(x, y)
             self._camera_x = x
             self._camera_y = y
+
+    def flush(self):
+        lw = self._scale if self._pixel_art else 1.0
+        self._fill.flush()
+        self._lines.flush(lw)
+        glColor4f(1, 1, 1, 1)
 
     def pal(self, col1=None, col2=None):
         pass
@@ -1080,6 +1153,7 @@ class App:
                 self.running = False
 
             self.input.update()
+            self.graphics.flush()
             glfw.swap_buffers(self._window)
             self.frame_count += 1
 
