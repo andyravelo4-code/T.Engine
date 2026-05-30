@@ -1,7 +1,7 @@
 import heapq
 import math
 
-import pygame
+from PIL import Image, ImageDraw
 
 from Engine import engine as e
 from Entities.Object import Object
@@ -139,7 +139,8 @@ class Npc(Object):
         if self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
             alpha = int(255 * (1.0 - progress))
-            surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+            surf = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(surf)
             center = (16, 16)
             radius = 8 + progress * 3
             points = []
@@ -156,7 +157,7 @@ class Npc(Object):
                 py = center[1] + math.sin(rad) * r
                 points.append((px, py))
             if len(points) >= 3:
-                pygame.draw.polygon(surf, (255, 255, 255, alpha), points)
+                draw.polygon(points, fill=(255, 255, 255, alpha))
             e.graphics.screen.blit(surf, (self.x + self.w/2 - 16 + e.graphics._camera_x, self.y + self.h/2 - 16 + e.graphics._camera_y))
 
         # Draw health dot

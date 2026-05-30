@@ -1,4 +1,4 @@
-import pygame
+from PIL import Image
 from Engine import engine as e
 from Entities.Item import Item
 
@@ -12,15 +12,15 @@ class Consumable(Item):
             _spr = bank
             _w, _h = w, h
         else:
-            _spr = pygame.Surface((4, 4), pygame.SRCALPHA)
-            _spr.set_at((1, 0), (180, 60, 60))
-            _spr.set_at((2, 0), (180, 60, 60))
+            _spr = Image.new('RGBA', (4, 4), (0, 0, 0, 0))
+            _spr.putpixel((1, 0), (180, 60, 60))
+            _spr.putpixel((2, 0), (180, 60, 60))
             for xx in range(4):
-                _spr.set_at((xx, 1), (220, 80, 80))
+                _spr.putpixel((xx, 1), (220, 80, 80))
             for xx in range(4):
-                _spr.set_at((xx, 2), (200, 60, 60))
-            _spr.set_at((1, 3), (180, 40, 40))
-            _spr.set_at((2, 3), (180, 40, 40))
+                _spr.putpixel((xx, 2), (200, 60, 60))
+            _spr.putpixel((1, 3), (180, 40, 40))
+            _spr.putpixel((2, 3), (180, 40, 40))
             _w, _h = 4, 4
 
         super().__init__(x, y, _w, _h, _spr, parent, speed,

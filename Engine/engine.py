@@ -1,51 +1,320 @@
 """
-engine.py – Moteur de jeu compatible Pyxel utilisant Pygame
-Sans limitation de palette ni de résolution.
-À placer dans le même dossier que votre script principal.
+engine.py – Moteur de jeu 2D avec rendu PyOpenGL (GLFW + Pillow)
+API compatible avec le moteur Pygame original.
 """
 
 import importlib.resources as _resources
+import math
 import pathlib
 import random
 import sys
+from array import array
 
-import pygame
+import glfw
+from OpenGL.GL import *
+from PIL import Image, ImageDraw, ImageFont
+
+# ----------------------------------------------------------------------
+# Constantes de touches (GLFW)
+# ----------------------------------------------------------------------
+KEY_A = glfw.KEY_A
+KEY_B = glfw.KEY_B
+KEY_C = glfw.KEY_C
+KEY_D = glfw.KEY_D
+KEY_E = glfw.KEY_E
+KEY_F = glfw.KEY_F
+KEY_G = glfw.KEY_G
+KEY_H = glfw.KEY_H
+KEY_I = glfw.KEY_I
+KEY_J = glfw.KEY_J
+KEY_K = glfw.KEY_K
+KEY_L = glfw.KEY_L
+KEY_M = glfw.KEY_M
+KEY_N = glfw.KEY_N
+KEY_O = glfw.KEY_O
+KEY_P = glfw.KEY_P
+KEY_Q = glfw.KEY_Q
+KEY_R = glfw.KEY_R
+KEY_S = glfw.KEY_S
+KEY_T = glfw.KEY_T
+KEY_U = glfw.KEY_U
+KEY_V = glfw.KEY_V
+KEY_W = glfw.KEY_W
+KEY_X = glfw.KEY_X
+KEY_Y = glfw.KEY_Y
+KEY_Z = glfw.KEY_Z
+KEY_0 = glfw.KEY_0
+KEY_1 = glfw.KEY_1
+KEY_2 = glfw.KEY_2
+KEY_3 = glfw.KEY_3
+KEY_4 = glfw.KEY_4
+KEY_5 = glfw.KEY_5
+KEY_6 = glfw.KEY_6
+KEY_7 = glfw.KEY_7
+KEY_8 = glfw.KEY_8
+KEY_9 = glfw.KEY_9
+KEY_SPACE = glfw.KEY_SPACE
+KEY_UP = glfw.KEY_UP
+KEY_DOWN = glfw.KEY_DOWN
+KEY_LEFT = glfw.KEY_LEFT
+KEY_RIGHT = glfw.KEY_RIGHT
+KEY_ESCAPE = glfw.KEY_ESCAPE
+KEY_ENTER = glfw.KEY_ENTER
+KEY_RETURN = glfw.KEY_ENTER
+KEY_LSHIFT = glfw.KEY_LEFT_SHIFT
+KEY_RSHIFT = glfw.KEY_RIGHT_SHIFT
+KEY_LCTRL = glfw.KEY_LEFT_CONTROL
+KEY_RCTRL = glfw.KEY_RIGHT_CONTROL
+KEY_LALT = glfw.KEY_LEFT_ALT
+KEY_RALT = glfw.KEY_RIGHT_ALT
+KEY_TAB = glfw.KEY_TAB
+KEY_BACKSPACE = glfw.KEY_BACKSPACE
+
+MOUSE_BUTTON_LEFT = 1
+MOUSE_BUTTON_MIDDLE = 2
+MOUSE_BUTTON_RIGHT = 3
+
+# ----------------------------------------------------------------------
+# Couleur
+# ----------------------------------------------------------------------
+def _norm_color(color):
+    n = tuple(c / 255.0 for c in color[:3])
+    if len(color) == 4:
+        return n + (color[3] / 255.0,)
+    return n + (1.0,)
+
+def _has_alpha(color):
+    return len(color) == 4
+
+# ----------------------------------------------------------------------
+# Police
+# ----------------------------------------------------------------------
+_pixel_font_cache = {}
+
+def _font_path():
+    try:
+        return str(_resources.files('Engine') / 'fonts' / 'PressStart2P.ttf')
+    except Exception:
+        return str(pathlib.Path("assests/fonts/PressStart2P.ttf"))
+
+# ----------------------------------------------------------------------
+# Image compatible (PIL + cache texture OpenGL)
+# ----------------------------------------------------------------------
+class _Img:
+    __slots__ = ('_pil', '_tex_id', '_tex_up')
+    def __init__(self, pil):
+        self._pil = pil
+        self._tex_id = 0
+        self._tex_up = False
+
+    def get_width(self):
+        return self._pil.width
+
+    def get_height(self):
+        return self._pil.height
+
+    def get_size(self):
+        return self._pil.size
+
+    def _ensure_tex(self):
+        if not self._tex_up:
+            self._tex_id = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, self._tex_id)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            data = self._pil.tobytes()
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self._pil.width, self._pil.height,
+                         0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+            self._tex_up = True
+
+    def subsurface(self, *args):
+        if len(args) == 4:
+            u, v, w, h = args
+        else:
+            u, v, w, h = args[0]
+        c = self._pil.crop((u, v, u + w, v + h))
+        return _Img(c)
+
+    def set_alpha(self, alpha):
+        r, g, b, a = self._pil.split()
+        a = a.point(lambda _: alpha)
+        self._pil = Image.merge('RGBA', (r, g, b, a))
+        self._tex_up = False
+
+
+# Équivalent Font.render -> _Img
+class _FontWrap:
+    def __init__(self, pil_font, size):
+        self._font = pil_font
+        self._size = size
+
+    @property
+    def font(self):
+        return self._font
+
+    def render(self, s, antialias, color):
+        dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(dummy)
+        bb = dr.textbbox((0, 0), s, font=self._font)
+        tw = bb[2] - bb[0]
+        th = bb[3] - bb[1]
+        if tw < 1:
+            tw = 1
+        if th < 1:
+            th = 1
+        img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(img)
+        dr.text((0, 0), s, font=self._font, fill=color)
+        if not antialias:
+            # PIL TrueType always anti-aliases; threshold alpha for crisp pixel font
+            r, g, b, a = img.split()
+            a = a.point(lambda x: 255 if x > 127 else 0)
+            img = Image.merge('RGBA', (r, g, b, a))
+        return _Img(img)
+
+
+def default_font(size=6):
+    if size not in _pixel_font_cache:
+        try:
+            pil_font = ImageFont.truetype(_font_path(), size)
+        except Exception:
+            pil_font = ImageFont.load_default()
+        _pixel_font_cache[size] = _FontWrap(pil_font, size)
+    return _pixel_font_cache[size]
+
+
+# ----------------------------------------------------------------------
+# ScreenWrapper – émule e.graphics.screen.blit() / fill() / set_at() / get_at()
+# ----------------------------------------------------------------------
+class _Screen:
+    def __init__(self, width, height):
+        self._w = width
+        self._h = height
+
+    def get_width(self):
+        return self._w
+
+    def get_height(self):
+        return self._h
+
+    def get_size(self):
+        return (self._w, self._h)
+
+    def blit(self, source, dest, area=None, special_flags=0):
+        if isinstance(dest, (list, tuple)):
+            dx, dy = int(dest[0]), int(dest[1])
+        else:
+            dx, dy = int(dest.x), int(dest.y)
+
+        if isinstance(source, _Img):
+            pil_img = source._pil
+        elif isinstance(source, Image.Image):
+            pil_img = source
+        else:
+            w, h = source.get_size()
+            data = None
+            if hasattr(source, 'tobytes'):
+                data = source.tobytes()
+            elif hasattr(source, 'get_buffer'):
+                data = bytes(source.get_buffer())
+            if data is None:
+                return
+            try:
+                pil_img = Image.frombuffer('RGBA', (w, h), data, 'raw', 'RGBA', 0, 1)
+            except Exception:
+                return
+
+        if area:
+            u, v, w, h = area
+            pil_img = pil_img.crop((u, v, u + w, v + h))
+        w, h = pil_img.size
+
+        tex = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     pil_img.tobytes())
+
+        glEnable(GL_TEXTURE_2D)
+        glBegin(GL_QUADS)
+        glTexCoord2f(0, 0); glVertex2i(dx, dy)
+        glTexCoord2f(1, 0); glVertex2i(dx + w, dy)
+        glTexCoord2f(1, 1); glVertex2i(dx + w, dy + h)
+        glTexCoord2f(0, 1); glVertex2i(dx, dy + h)
+        glEnd()
+        glDeleteTextures(1, [tex])
+
+    def fill(self, color):
+        c = _norm_color(color)
+        glClearColor(c[0], c[1], c[2], 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+    def set_at(self, pos, color):
+        glDisable(GL_TEXTURE_2D)
+        c = _norm_color(color)
+        glColor4f(*c)
+        glBegin(GL_QUADS)
+        glVertex2i(int(pos[0]), int(pos[1]))
+        glVertex2i(int(pos[0]) + 1, int(pos[1]))
+        glVertex2i(int(pos[0]) + 1, int(pos[1]) + 1)
+        glVertex2i(int(pos[0]), int(pos[1]) + 1)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+
+    def get_at(self, pos):
+        data = glReadPixels(int(pos[0]), self._h - int(pos[1]) - 1, 1, 1,
+                            GL_RGBA, GL_UNSIGNED_BYTE)
+        return (data[0], data[1], data[2], data[3])
 
 
 # ----------------------------------------------------------------------
 # Entrées
 # ----------------------------------------------------------------------
 class Input:
-    def __init__(self):
+    def __init__(self, window):
+        self._window = window
         self._keys_pressed = {}
         self._keys_just_pressed = {}
         self._keys_just_released = {}
         self._mouse_pressed = {}
         self._mouse_just_pressed = {}
         self._mouse_just_released = {}
+        self._mouse_x = 0
+        self._mouse_y = 0
         self._joysticks = []
-        self._init_joysticks()
 
-    def _init_joysticks(self):
-        pygame.joystick.init()
-        for i in range(pygame.joystick.get_count()):
-            joy = pygame.joystick.Joystick(i)
-            joy.init()
-            self._joysticks.append(joy)
+        glfw.set_key_callback(window, self._key_cb)
+        glfw.set_mouse_button_callback(window, self._mouse_cb)
+        glfw.set_cursor_pos_callback(window, self._cursor_cb)
 
-    def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
-            self._keys_just_pressed[event.key] = True
-            self._keys_pressed[event.key] = True
-        elif event.type == pygame.KEYUP:
-            self._keys_just_released[event.key] = True
-            self._keys_pressed[event.key] = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            self._mouse_just_pressed[event.button] = True
-            self._mouse_pressed[event.button] = True
-        elif event.type == pygame.MOUSEBUTTONUP:
-            self._mouse_just_released[event.button] = True
-            self._mouse_pressed[event.button] = False
+    def _key_cb(self, window, key, scancode, action, mods):
+        if key < 0:
+            return
+        if action == glfw.PRESS or action == glfw.REPEAT:
+            self._keys_just_pressed[key] = True
+            self._keys_pressed[key] = True
+        elif action == glfw.RELEASE:
+            self._keys_just_released[key] = True
+            self._keys_pressed[key] = False
+
+    def _mouse_cb(self, window, button, action, mods):
+        b = button + 1
+        if action == glfw.PRESS:
+            self._mouse_just_pressed[b] = True
+            self._mouse_pressed[b] = True
+        elif action == glfw.RELEASE:
+            self._mouse_just_released[b] = True
+            self._mouse_pressed[b] = False
+
+    def _cursor_cb(self, window, x, y):
+        self._mouse_x = x
+        self._mouse_y = y
 
     def update(self):
         self._keys_just_pressed.clear()
@@ -63,7 +332,8 @@ class Input:
         return self._keys_just_released.get(key, False)
 
     def mouse(self, visible=True):
-        pygame.mouse.set_visible(visible)
+        mode = glfw.CURSOR_NORMAL if visible else glfw.CURSOR_HIDDEN
+        glfw.set_input_mode(self._window, glfw.CURSOR, mode)
 
     def mouse_btn(self, button):
         return self._mouse_pressed.get(button, False)
@@ -73,16 +343,6 @@ class Input:
 
     def mouse_btnr(self, button):
         return self._mouse_just_released.get(button, False)
-
-    def joy(self, joy_id, button):
-        if joy_id < len(self._joysticks):
-            return self._joysticks[joy_id].get_button(button)
-        return False
-
-    def joy_axis(self, joy_id, axis):
-        if joy_id < len(self._joysticks):
-            return self._joysticks[joy_id].get_axis(axis)
-        return 0.0
 
 
 # ----------------------------------------------------------------------
@@ -100,225 +360,490 @@ class Resources:
 
     def image(self, bank, img_path, colkey=None):
         try:
-            img = pygame.image.load(img_path).convert_alpha()
+            pil = Image.open(img_path).convert('RGBA')
             if colkey:
-                img.set_colorkey(colkey)
+                data = pil.load()
+                for y in range(pil.height):
+                    for x in range(pil.width):
+                        p = data[x, y]
+                        if p[:3] == colkey[:3]:
+                            data[x, y] = (0, 0, 0, 0)
             while len(self.images) <= bank:
                 self.images.append(None)
-            self.images[bank] = img
-            return img
-        except pygame.error as e:
-            print(f"Erreur chargement image {img_path} : {e}")
+            self.images[bank] = _Img(pil)
+            return self.images[bank]
+        except Exception as e:
+            print(f"Erreur chargement image {img_path}: {e}")
             return None
 
     def sound(self, bank, sound_path):
-        try:
-            sound = pygame.mixer.Sound(sound_path)
-            self.sounds[bank] = sound
-            return sound
-        except pygame.error as e:
-            print(f"Erreur chargement son {sound_path} : {e}")
-            return None
+        print(f"Son non implémenté (OpenGL): {sound_path}")
+        self.sounds[bank] = None
+        return None
 
     def music(self, bank, music_path):
         self.musics[bank] = music_path
 
     def tilemap(self, bank):
-        return None  # non implémenté
+        return None
 
 
 # ----------------------------------------------------------------------
-# Audio
+# Audio (stub – pas de dépendance audio)
 # ----------------------------------------------------------------------
 class Audio:
     def __init__(self):
-        pygame.mixer.init()
-        self.channels = [pygame.mixer.Channel(i) for i in range(8)]
         self.sounds = {}
         self.musics = {}
 
     def play(self, ch, s, loop=False):
-        if ch < len(self.channels) and s in self.sounds:
-            self.channels[ch].play(self.sounds[s], loops=-1 if loop else 0)
+        pass
 
     def playm(self, m, loop=False):
-        if m in self.musics:
-            pygame.mixer.music.load(self.musics[m])
-            pygame.mixer.music.play(-1 if loop else 0)
+        pass
 
     def stop(self, ch=None):
-        if ch is None:
-            pygame.mixer.stop()
-        elif ch < len(self.channels):
-            self.channels[ch].stop()
+        pass
 
     def play_pos(self, ch):
-        if ch < len(self.channels):
-            return self.channels[ch].get_busy()
         return False
 
 
 # ----------------------------------------------------------------------
-# Graphiques
+# Graphiques (OpenGL)
 # ----------------------------------------------------------------------
 class Graphics:
-    def __init__(self, screen: pygame.Surface = None):
-        if screen:
-            self.screen = screen
-        self._clip_rect = None
+    def __init__(self, width, height, display_scale, pixel_art=True):
+        self._w = width
+        self._h = height
+        self._scale = display_scale
+        self._pixel_art = pixel_art
         self._camera_x = 0
         self._camera_y = 0
+        self._clip_rect = None
         self._default_font = None
+        self._font_wrap = None
+        self._tex_cache = {}       # id(_Img) -> bool (uploaded)
+        self._colkey_cache = {}    # (img_id, u, v, w, h, colkey) -> tex_id
+        self._circle_cache = {}    # radius -> (display list | vertices)
 
-    def _has_alpha(self, color):
-        return isinstance(color, (tuple, list)) and len(color) == 4
+        # Écran de compatibilité
+        self.screen = _Screen(width, height)
 
-    def _draw_with_alpha(self, draw_func, *args):
-        if self._has_alpha(args[-1]):
-            color = args[-1]
-            temp_surf = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
-            orig_screen = self.screen
-            self.screen = temp_surf
-            draw_func(*args[:-1], color)
-            self.screen = orig_screen
-            temp_surf.blit(temp_surf, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
-            orig_screen.blit(temp_surf, (0, 0))
-        else:
-            draw_func(*args)
+        # Projection
+        glViewport(0, 0, width * display_scale, height * display_scale)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, width, height, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
 
-    def cls(self, color):
-        self.screen.fill(color)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glReadBuffer(GL_BACK)
+        glEnable(GL_TEXTURE_2D)
+        glClearColor(0, 0, 0, 1)
+        glClear(GL_COLOR_BUFFER_BIT)
 
-    def pset(self, x, y, color):
-        if self._clip_rect and not self._clip_rect.collidepoint(x, y):
-            return
+    # --- Aide texture ---
+    def _upload_tex(self, pil_img):
+        tex = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        data = pil_img.tobytes()
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pil_img.width, pil_img.height,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+        return tex
+
+    def _tex_of(self, img):
+        if isinstance(img, _Img):
+            img._ensure_tex()
+            return img._tex_id, img._pil.width, img._pil.height
+        if isinstance(img, Image.Image):
+            tid = self._tex_cache.get(id(img))
+            if tid is None:
+                tid = self._upload_tex(img)
+                self._tex_cache[id(img)] = tid
+            return tid, img.width, img.height
+        return 0, 0, 0
+
+    # --- Primitives ---
+    def _draw_quad(self, x, y, w, h, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
         x += self._camera_x
         y += self._camera_y
-        if 0 <= x < self.screen.get_width() and 0 <= y < self.screen.get_height():
-            self.screen.set_at((int(x), int(y)), color)
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_QUADS)
+        glVertex2f(x, y)
+        glVertex2f(x + w, y)
+        glVertex2f(x + w, y + h)
+        glVertex2f(x, y + h)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def _draw_outline(self, x, y, w, h, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
+        x += self._camera_x
+        y += self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        if self._pixel_art:
+            glLineWidth(self._scale)
+        glBegin(GL_LINE_LOOP)
+        glVertex2f(x, y)
+        glVertex2f(x + w, y)
+        glVertex2f(x + w, y + h)
+        glVertex2f(x, y + h)
+        glEnd()
+        if self._pixel_art:
+            glLineWidth(1.0)
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def cls(self, color):
+        c = _norm_color(color)
+        glClearColor(c[0], c[1], c[2], 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+    def pset(self, x, y, color):
+        x += self._camera_x
+        y += self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_QUADS)
+        glVertex2f(x, y)
+        glVertex2f(x + 1, y)
+        glVertex2f(x + 1, y + 1)
+        glVertex2f(x, y + 1)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
     def pget(self, x, y):
         x += self._camera_x
         y += self._camera_y
-        if 0 <= x < self.screen.get_width() and 0 <= y < self.screen.get_height():
-            return self.screen.get_at((x, y))
+        if 0 <= x < self._w and 0 <= y < self._h:
+            data = glReadPixels(int(x), int(self._h * self._scale - y - 1),
+                                1, 1, GL_RGBA, GL_UNSIGNED_BYTE)
+            return (data[0], data[1], data[2], data[3])
         return (0, 0, 0, 0)
 
     def line(self, x1, y1, x2, y2, color):
-        def _draw_line(c):
-            pygame.draw.line(
-                self.screen,
-                c,
-                (x1 + self._camera_x, y1 + self._camera_y),
-                (x2 + self._camera_x, y2 + self._camera_y),
-            )
-        self._draw_with_alpha(_draw_line, color)
+        if self._pixel_art:
+            x1 = round(x1)
+            y1 = round(y1)
+            x2 = round(x2)
+            y2 = round(y2)
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        if self._pixel_art:
+            glLineWidth(self._scale)
+        glBegin(GL_LINES)
+        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
+        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
+        glEnd()
+        if self._pixel_art:
+            glLineWidth(1.0)
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
     def rect(self, x, y, w, h, color):
-        def _draw_rect(c):
-            r = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-            if self._clip_rect:
-                r = r.clip(self._clip_rect)
-            pygame.draw.rect(self.screen, c, r)
-        self._draw_with_alpha(_draw_rect, color)
+        self._draw_quad(x, y, w, h, color)
 
     def rectb(self, x, y, w, h, color):
-        def _draw_rectb(c):
-            r = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-            if self._clip_rect:
-                r = r.clip(self._clip_rect)
-            pygame.draw.rect(self.screen, c, r, 1)
-        self._draw_with_alpha(_draw_rectb, color)
+        self._draw_outline(x, y, w, h, color)
 
     def circ(self, x, y, r, color):
-        def _draw_circ(c):
-            pygame.draw.circle(
-                self.screen, c, (int(x + self._camera_x), int(y + self._camera_y)), r
-            )
-        self._draw_with_alpha(_draw_circ, color)
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            r = round(r)
+        cx = x + self._camera_x
+        cy = y + self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int(r * 2))
+        glBegin(GL_TRIANGLE_FAN)
+        glVertex2f(cx, cy)
+        for i in range(segs + 1):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + r * math.cos(a),
+                       cy + r * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
     def circb(self, x, y, r, color):
-        def _draw_circb(c):
-            pygame.draw.circle(
-                self.screen, c, (int(x + self._camera_x), int(y + self._camera_y)), r, 1
-            )
-        self._draw_with_alpha(_draw_circb, color)
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            r = round(r)
+        cx = x + self._camera_x
+        cy = y + self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int(r * 2))
+        glBegin(GL_LINE_LOOP)
+        for i in range(segs):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + r * math.cos(a),
+                       cy + r * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
     def elli(self, x, y, w, h, color):
-        def _draw_elli(c):
-            rect = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-            pygame.draw.ellipse(self.screen, c, rect)
-        self._draw_with_alpha(_draw_elli, color)
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
+        cx = x + self._camera_x + w / 2
+        cy = y + self._camera_y + h / 2
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int((w + h) / 2))
+        glBegin(GL_TRIANGLE_FAN)
+        glVertex2f(cx, cy)
+        for i in range(segs + 1):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + w / 2 * math.cos(a),
+                       cy + h / 2 * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
     def ellib(self, x, y, w, h, color):
-        def _draw_ellib(c):
-            rect = pygame.Rect(x + self._camera_x, y + self._camera_y, w, h)
-            pygame.draw.ellipse(self.screen, c, rect, 1)
-        self._draw_with_alpha(_draw_ellib, color)
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
+        cx = x + self._camera_x + w / 2
+        cy = y + self._camera_y + h / 2
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int((w + h) / 2))
+        glBegin(GL_LINE_LOOP)
+        for i in range(segs):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + w / 2 * math.cos(a),
+                       cy + h / 2 * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
     def tri(self, x1, y1, x2, y2, x3, y3, color):
-        def _draw_tri(c):
-            points = [
-                (x1 + self._camera_x, y1 + self._camera_y),
-                (x2 + self._camera_x, y2 + self._camera_y),
-                (x3 + self._camera_x, y3 + self._camera_y),
-            ]
-            pygame.draw.polygon(self.screen, c, points)
-        self._draw_with_alpha(_draw_tri, color)
+        if self._pixel_art:
+            x1 = round(x1); y1 = round(y1)
+            x2 = round(x2); y2 = round(y2)
+            x3 = round(x3); y3 = round(y3)
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_TRIANGLES)
+        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
+        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
+        glVertex2f(x3 + self._camera_x, y3 + self._camera_y)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
     def trib(self, x1, y1, x2, y2, x3, y3, color):
-        def _draw_trib(c):
-            points = [
-                (x1 + self._camera_x, y1 + self._camera_y),
-                (x2 + self._camera_x, y2 + self._camera_y),
-                (x3 + self._camera_x, y3 + self._camera_y),
-            ]
-            pygame.draw.polygon(self.screen, c, points, 1)
-        self._draw_with_alpha(_draw_trib, color)
+        if self._pixel_art:
+            x1 = round(x1); y1 = round(y1)
+            x2 = round(x2); y2 = round(y2)
+            x3 = round(x3); y3 = round(y3)
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        if self._pixel_art:
+            glLineWidth(self._scale)
+        glBegin(GL_LINE_LOOP)
+        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
+        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
+        glVertex2f(x3 + self._camera_x, y3 + self._camera_y)
+        glEnd()
+        if self._pixel_art:
+            glLineWidth(1.0)
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
 
+    # --- Texte ---
     def text(self, x, y, s, color, font=None):
         if font is None:
-            if self._default_font is None:
-                self._default_font = default_font(6)
-            font = self._default_font
-        surf = font.render(s, False, color)
-        self.screen.blit(surf, (x + self._camera_x, y + self._camera_y))
+            if self._font_wrap is None:
+                self._font_wrap = default_font(6)
+            font = self._font_wrap
+        elif not isinstance(font, _FontWrap):
+            font = _FontWrap(font, 6)
 
+        dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(dummy)
+        bb = dr.textbbox((0, 0), s, font=font.font)
+        tw = max(1, bb[2] - bb[0])
+        th = max(1, bb[3] - bb[1])
+        img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(img)
+        dr.text((0, 0), s, font=font.font, fill=color)
+        # PIL TrueType always anti-aliases; threshold alpha for crisp pixel font
+        r, g, b, a = img.split()
+        a = a.point(lambda x: 255 if x > 127 else 0)
+        img = Image.merge('RGBA', (r, g, b, a))
+
+        tex = self._upload_tex(img)
+        dx = x + self._camera_x
+        dy = y + self._camera_y
+
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glBegin(GL_QUADS)
+        glTexCoord2f(0, 0); glVertex2f(dx, dy)
+        glTexCoord2f(1, 0); glVertex2f(dx + tw, dy)
+        glTexCoord2f(1, 1); glVertex2f(dx + tw, dy + th)
+        glTexCoord2f(0, 1); glVertex2f(dx, dy + th)
+        glEnd()
+        glDeleteTextures(1, [tex])
+
+    # --- Blit (sprite) ---
     def blt(self, x, y, img, u, v, w, h, colkey=None, rotate=0):
-        dest_x = x + self._camera_x
-        dest_y = y + self._camera_y
+        dx = x + self._camera_x
+        dy = y + self._camera_y
 
+        # Rotation path: use PIL rotation like pygame.transform.rotate()
         if rotate != 0:
-            sub = img.subsurface((u, v, w, h))
-            sub = pygame.transform.rotate(sub, rotate)
-            if colkey is not None:
-                sub.set_colorkey(colkey)
-            cx = dest_x + w / 2
-            cy = dest_y + h / 2
-            rect = sub.get_rect(center=(cx, cy))
-            self.screen.blit(sub, rect.topleft)
-        else:
-            if colkey is not None:
-                sub = img.subsurface((u, v, w, h))
-                sub.set_colorkey(colkey)
-                self.screen.blit(sub, (dest_x, dest_y))
+            # Extract sub-image from source
+            if isinstance(img, _Img):
+                pil_src = img._pil
+            elif isinstance(img, Image.Image):
+                pil_src = img
             else:
-                self.screen.blit(img, (dest_x, dest_y), (u, v, w, h))
+                return
+            sub = pil_src.crop((u, v, u + w, v + h))
+            sub = sub.rotate(rotate, expand=True, resample=Image.NEAREST)
+
+            # Apply colkey if needed
+            if colkey is not None:
+                if isinstance(colkey, int):
+                    ck = (colkey & 0xFF, (colkey >> 8) & 0xFF, (colkey >> 16) & 0xFF)
+                else:
+                    ck = tuple(colkey[:3])
+                data = sub.load()
+                for py in range(sub.height):
+                    for px in range(sub.width):
+                        p = data[px, py]
+                        if isinstance(p, int):
+                            match = (p & 0xFF, (p >> 8) & 0xFF, (p >> 16) & 0xFF) == ck
+                        else:
+                            match = p[:3] == ck
+                        if match:
+                            data[px, py] = (0, 0, 0, 0)
+
+            tex_id = self._upload_tex(sub)
+            glBindTexture(GL_TEXTURE_2D, tex_id)
+
+            # Center the rotated surface on original center (like pygame)
+            sw, sh = sub.size
+            cx = dx + w / 2
+            cy = dy + h / 2
+            sx = cx - sw / 2
+            sy = cy - sh / 2
+
+            glBegin(GL_QUADS)
+            glTexCoord2f(0, 0); glVertex2f(sx, sy)
+            glTexCoord2f(1, 0); glVertex2f(sx + sw, sy)
+            glTexCoord2f(1, 1); glVertex2f(sx + sw, sy + sh)
+            glTexCoord2f(0, 1); glVertex2f(sx, sy + sh)
+            glEnd()
+            glDeleteTextures(1, [tex_id])
+            return
+
+        # Non-rotated path (unchanged)
+        if colkey is not None and isinstance(img, _Img):
+            if isinstance(colkey, int):
+                ck = (colkey & 0xFF, (colkey >> 8) & 0xFF, (colkey >> 16) & 0xFF)
+            else:
+                ck = tuple(colkey[:3])
+            key = (id(img), u, v, w, h, ck)
+            tid = self._colkey_cache.get(key)
+            if tid is None:
+                sub = img._pil.crop((u, v, u + w, v + h))
+                data = sub.load()
+                for py in range(h):
+                    for px in range(w):
+                        p = data[px, py]
+                        if isinstance(p, int):
+                            match = (p & 0xFF, (p >> 8) & 0xFF, (p >> 16) & 0xFF) == ck
+                        else:
+                            match = p[:3] == ck
+                        if match:
+                            data[px, py] = (0, 0, 0, 0)
+                tid = self._upload_tex(sub)
+                self._colkey_cache[key] = tid
+            tex_id, iw, ih = tid, w, h
+            tu1 = 0
+            tv1 = 0
+            tu2 = 1
+            tv2 = 1
+        else:
+            tex_id, iw, ih = self._tex_of(img)
+            tu1 = u / iw if iw > 0 else 0
+            tv1 = v / ih if ih > 0 else 0
+            tu2 = (u + w) / iw if iw > 0 else 1
+            tv2 = (v + h) / ih if ih > 0 else 1
+
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+        glBegin(GL_QUADS)
+        glTexCoord2f(tu1, tv1); glVertex2f(dx, dy)
+        glTexCoord2f(tu2, tv1); glVertex2f(dx + w, dy)
+        glTexCoord2f(tu2, tv2); glVertex2f(dx + w, dy + h)
+        glTexCoord2f(tu1, tv2); glVertex2f(dx, dy + h)
+        glEnd()
 
     def bltm(self, x, y, tm, u, v, w, h, colkey=None):
-        pass  # non implémenté
+        pass
 
     def clip(self, x=None, y=None, w=None, h=None):
         if x is None:
+            glDisable(GL_SCISSOR_TEST)
             self._clip_rect = None
         else:
-            self._clip_rect = pygame.Rect(x, y, w, h)
+            glEnable(GL_SCISSOR_TEST)
+            sx = int(x)
+            sy = int(self._h * self._scale - (y + h))
+            sw = int(w)
+            sh = int(h)
+            glScissor(sx, sy, sw, sh)
+            self._clip_rect = (x, y, w, h)
 
     def camera(self, x=None, y=None):
         if x is None:
             self._camera_x = 0
             self._camera_y = 0
         else:
+            if self._pixel_art:
+                x = round(x)
+                y = round(y)
             self._camera_x = x
             self._camera_y = y
 
@@ -329,131 +854,132 @@ class Graphics:
         pass
 
 
+# ----------------------------------------------------------------------
+# Caméra
+# ----------------------------------------------------------------------
 class Camera:
-    """Caméra réutilisable avec suivi de cible, offset souris et tremblement."""
-
-    def __init__(
-        self, target, screen_width, screen_height, mouse_influence=0.2, mouse_limit=10
-    ):
-        self.target = target  # objet avec .x et .y
+    def __init__(self, target, screen_width, screen_height,
+                 mouse_influence=0.2, mouse_limit=10):
+        self.target = target
         self.width = screen_width
         self.height = screen_height
-        self.mouse_influence = mouse_influence  # sensibilité du regard (0..1)
-        self.mouse_limit = mouse_limit  # amplitude max en pixels
-
+        self.mouse_influence = mouse_influence
+        self.mouse_limit = mouse_limit
         self.shake_duration = 0
         self.shake_intensity = 0
         self.shake_offset_x = 0
         self.shake_offset_y = 0
-
         self.flash_color = (255, 255, 255)
         self.flash_alpha = 0
         self.flash_duration = 0
-
         self.cam_x = 0
         self.cam_y = 0
 
     def shake(self, duration, intensity):
-        """Déclenche un tremblement d'écran."""
         self.shake_duration = duration
         self.shake_intensity = intensity
 
     def flash(self, color, alpha, duration):
-        """Déclenche un flash d'écran."""
         self.flash_color = color
         self.flash_alpha = alpha
         self.flash_duration = duration
 
     def update(self):
         global _global_mouse_pos
-        # --- Flash overlay ---
         if self.flash_alpha > 0:
             self.flash_duration -= 1
             if self.flash_duration <= 0:
                 self.flash_alpha = max(0, self.flash_alpha - 8)
 
-        # --- Gestion du shake ---
         if self.shake_duration > 0:
             self.shake_duration -= 1
             if self.shake_duration % 5 == 0:
                 self.shake_intensity = max(0, self.shake_intensity - 1)
         else:
             self.shake_intensity = 0
-            
+
         if self.shake_intensity > 0:
-            self.shake_offset_x = random.randint(
-                -self.shake_intensity, self.shake_intensity
-            )
-            self.shake_offset_y = random.randint(
-                -self.shake_intensity, self.shake_intensity
-            )
+            self.shake_offset_x = random.randint(-self.shake_intensity, self.shake_intensity)
+            self.shake_offset_y = random.randint(-self.shake_intensity, self.shake_intensity)
         else:
             self.shake_offset_x = 0
             self.shake_offset_y = 0
 
-        # --- Offset souris ---
-        mx = mouse_x()  # fonction globale de engine
+        mx = mouse_x()
         my = mouse_y()
         _global_mouse_pos = (mx - self.cam_x, my - self.cam_y)
-        center_x = self.width / 2
-        center_y = self.height / 2
-
-        # Décalage proportionnel à la distance de la souris au centre
-        dx = (mx - center_x) * self.mouse_influence
-        dy = (my - center_y) * self.mouse_influence
-        # Limitation
+        cx = self.width / 2
+        cy = self.height / 2
+        dx = (mx - cx) * self.mouse_influence
+        dy = (my - cy) * self.mouse_influence
         dx = max(-self.mouse_limit, min(self.mouse_limit, dx))
         dy = max(-self.mouse_limit, min(self.mouse_limit, dy))
-
-        # Position écran souhaitée pour la cible
-        target_screen_x = center_x - dx
-        target_screen_y = center_y - dy
-
-        # Calcul du décalage caméra à appliquer
-        self.cam_x = target_screen_x - self.target.x + self.shake_offset_x
-        self.cam_y = target_screen_y - self.target.y + self.shake_offset_y
+        tsx = cx - dx
+        tsy = cy - dy
+        self.cam_x = tsx - self.target.x + self.shake_offset_x
+        self.cam_y = tsy - self.target.y + self.shake_offset_y
 
     def apply(self):
-        """Applique la caméra calculée."""
-        camera(self.cam_x, self.cam_y)  # fonction globale définie dans engine
+        camera(self.cam_x, self.cam_y)
 
 
 # ----------------------------------------------------------------------
 # Application principale
 # ----------------------------------------------------------------------
 class App:
-    def __init__(self, width, height, title, fps, display_scale):
-        pygame.init()
+    def __init__(self, width, height, title, fps, display_scale, pixel_art=True):
+        if not glfw.init():
+            raise RuntimeError("Échec glfw.init()")
+
+        glfw.window_hint(glfw.RESIZABLE, glfw.FALSE)
+        glfw.window_hint(glfw.SCALE_TO_MONITOR, glfw.TRUE)
+
         self.width = width
         self.height = height
         self.display_scale = display_scale
-        self.screen = pygame.display.set_mode(
-            (width, height),
-            pygame.SCALED | pygame.RESIZABLE,
-        )
-        pygame.display.set_caption(title)
-        self.clock = pygame.time.Clock()
         self.fps = fps
-        self.running = False
         self.frame_count = 0
         self.mouse_x = 0
         self.mouse_y = 0
-        self.virtual_screen = pygame.Surface((width, height))
-        self.input = Input()
-        self.graphics = Graphics(self.virtual_screen)
+        self.running = False
+
+        win_w = width * display_scale
+        win_h = height * display_scale
+        self._window = glfw.create_window(int(win_w), int(win_h), title, None, None)
+        if not self._window:
+            glfw.terminate()
+            raise RuntimeError("Échec création fenêtre GLFW")
+
+        glfw.make_context_current(self._window)
+        # VSync désactivé par défaut (compatible headless / tout environnement)
+        glfw.swap_interval(0)
+
+        self.input = Input(self._window)
+        self.graphics = Graphics(width, height, display_scale, pixel_art)
         self.audio = Audio()
         self.resources = Resources()
-        pygame.mouse.set_visible(False)
 
     def run(self, update, draw):
         self.running = True
-        while self.running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                self.input.handle_event(event)
+        clock = glfw.get_time()
+        target_dt = 1.0 / self.fps
 
-            self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
+        while self.running and not glfw.window_should_close(self._window):
+            now = glfw.get_time()
+            dt = now - clock
+            clock = now
+
+            glfw.poll_events()
+
+            # Mouse position en coordonnées logiques
+            mx, my = glfw.get_cursor_pos(self._window)
+            self.mouse_x = mx / self.display_scale
+            self.mouse_y = my / self.display_scale
+
+            # Flash overlay
+            g = self.graphics
+            if g.screen and hasattr(self, '_flash') and self._flash_alpha > 0:
+                pass  # flash géré via entité
 
             try:
                 update()
@@ -464,39 +990,44 @@ class App:
                 self.running = False
 
             self.input.update()
-
-            self.screen.blit(self.virtual_screen, (0, 0))
-            pygame.display.flip()
+            glfw.swap_buffers(self._window)
             self.frame_count += 1
-            self.clock.tick(self.fps)
+
+            # Attente pour respecter le FPS
+            elapsed = glfw.get_time() - now
+            sleep = target_dt - elapsed
+            if sleep > 0:
+                import time
+                time.sleep(sleep)
 
         self.quit()
 
     def quit(self):
-        pygame.quit()
+        self.running = False
+        glfw.terminate()
         sys.exit()
 
 
 # ----------------------------------------------------------------------
-# Interface globale (simule l'API de Pyxel)
+# Interface globale
 # ----------------------------------------------------------------------
 _app = None
 _width = 256
 _height = 256
 _global_mouse_pos = (0, 0)
+active_camera = None
 
-# Modules publics (remplis après init)
-graphics = Graphics()
-input = Input()
+graphics = Graphics(256, 256, 1)
+input = Input(None) if False else None  # placeholder
 resources = Resources()
 audio = Audio()
 
 
-def init(width, height, title="Pyxel Compat", fps=30, display_scale=1):
+def init(width, height, title="Pyxel Compat", fps=30, display_scale=1, pixel_art=True):
     global _app, _width, _height, graphics, input, resources, audio
     _width = width
     _height = height
-    _app = App(width, height, title, fps, display_scale)
+    _app = App(width, height, title, fps, display_scale, pixel_art)
     graphics = _app.graphics
     input = _app.input
     resources = _app.resources
@@ -505,16 +1036,13 @@ def init(width, height, title="Pyxel Compat", fps=30, display_scale=1):
 
 def run(update, draw):
     if not _app:
-        raise RuntimeError("Appel px.init() d'abord")
+        raise RuntimeError("Appel e.init() d'abord")
     _app.run(update, draw)
 
 
 def quit():
     if _app:
         _app.quit()
-
-
-# Propriétés globales
 
 
 def width():
@@ -541,184 +1069,75 @@ def mouse_y():
 def cls(color):
     graphics.cls(color)
 
-
 def pset(x, y, color):
     graphics.pset(x, y, color)
-
 
 def pget(x, y):
     return graphics.pget(x, y)
 
-
 def line(x1, y1, x2, y2, color):
     graphics.line(x1, y1, x2, y2, color)
-
 
 def rect(x, y, w, h, color):
     graphics.rect(x, y, w, h, color)
 
-
 def rectb(x, y, w, h, color):
     graphics.rectb(x, y, w, h, color)
-
 
 def circ(x, y, r, color):
     graphics.circ(x, y, r, color)
 
-
 def circb(x, y, r, color):
     graphics.circb(x, y, r, color)
-
 
 def elli(x, y, w, h, color):
     graphics.elli(x, y, w, h, color)
 
-
 def ellib(x, y, w, h, color):
     graphics.ellib(x, y, w, h, color)
-
 
 def tri(x1, y1, x2, y2, x3, y3, color):
     graphics.tri(x1, y1, x2, y2, x3, y3, color)
 
-
 def trib(x1, y1, x2, y2, x3, y3, color):
     graphics.trib(x1, y1, x2, y2, x3, y3, color)
-
 
 def text(x, y, s, color, font=None):
     graphics.text(x, y, s, color, font)
 
-
 def blt(x, y, img, u, v, w, h, colkey=None, rotate=0):
     graphics.blt(x, y, img, u, v, w, h, colkey, rotate)
-
 
 def bltm(x, y, tm, u, v, w, h, colkey=None):
     graphics.bltm(x, y, tm, u, v, w, h, colkey)
 
-
 def clip(x=None, y=None, w=None, h=None):
     graphics.clip(x, y, w, h)
-
 
 def camera(x=None, y=None):
     graphics.camera(x, y)
 
-
 def pal(col1=None, col2=None):
     graphics.pal(col1, col2)
-
 
 def dither(alpha):
     graphics.dither(alpha)
 
-
 # Délégation entrée
-def mouse_x():
-    return _app.mouse_x if _app else 0
-
-
-def mouse_y():
-    return _app.mouse_y if _app else 0
-
-
 def mouse_btn(button):
     return input.mouse_btn(button) if input else False
-
 
 def mouse_btnp(button):
     return input.mouse_btnp(button) if input else False
 
-
 def mouse_btnr(button):
     return input.mouse_btnr(button) if input else False
-
 
 def btn(key):
     return input.btn(key) if input else False
 
-
 def btnp(key, hold=0, period=0):
     return input.btnp(key, hold, period) if input else False
 
-
 def btnr(key):
     return input.btnr(key) if input else False
-
-
-# Police pixel art par défaut
-_pixel_font_cache = {}
-
-def _font_path():
-    """Retourne le chemin vers PressStart2P.ttf (package installé ou dev)."""
-    try:
-        return str(_resources.files('Engine') / 'fonts' / 'PressStart2P.ttf')
-    except Exception:
-        return str(pathlib.Path("assests/fonts/PressStart2P.ttf"))
-
-def default_font(size=6):
-    if size not in _pixel_font_cache:
-        try:
-            _pixel_font_cache[size] = pygame.font.Font(_font_path(), size)
-        except pygame.error:
-            _pixel_font_cache[size] = pygame.font.Font(None, size)
-    return _pixel_font_cache[size]
-
-
-# Constantes de touches (pygame)
-KEY_A = pygame.K_a
-KEY_B = pygame.K_b
-KEY_C = pygame.K_c
-KEY_D = pygame.K_d
-KEY_E = pygame.K_e
-KEY_F = pygame.K_f
-KEY_G = pygame.K_g
-KEY_H = pygame.K_h
-KEY_I = pygame.K_i
-KEY_J = pygame.K_j
-KEY_K = pygame.K_k
-KEY_L = pygame.K_l
-KEY_M = pygame.K_m
-KEY_N = pygame.K_n
-KEY_O = pygame.K_o
-KEY_P = pygame.K_p
-KEY_Q = pygame.K_q
-KEY_R = pygame.K_r
-KEY_S = pygame.K_s
-KEY_T = pygame.K_t
-KEY_U = pygame.K_u
-KEY_V = pygame.K_v
-KEY_W = pygame.K_w
-KEY_X = pygame.K_x
-KEY_Y = pygame.K_y
-KEY_Z = pygame.K_z
-KEY_0 = pygame.K_0
-KEY_1 = pygame.K_1
-KEY_2 = pygame.K_2
-KEY_3 = pygame.K_3
-KEY_4 = pygame.K_4
-KEY_5 = pygame.K_5
-KEY_6 = pygame.K_6
-KEY_7 = pygame.K_7
-KEY_8 = pygame.K_8
-KEY_9 = pygame.K_9
-KEY_SPACE = pygame.K_SPACE
-KEY_UP = pygame.K_UP
-KEY_DOWN = pygame.K_DOWN
-KEY_LEFT = pygame.K_LEFT
-KEY_RIGHT = pygame.K_RIGHT
-KEY_ESCAPE = pygame.K_ESCAPE
-KEY_RETURN = pygame.K_RETURN
-KEY_LSHIFT = pygame.K_LSHIFT
-KEY_RSHIFT = pygame.K_RSHIFT
-KEY_LCTRL = pygame.K_LCTRL
-KEY_RCTRL = pygame.K_RCTRL
-KEY_LALT = pygame.K_LALT
-KEY_RALT = pygame.K_RALT
-KEY_TAB = pygame.K_TAB
-KEY_BACKSPACE = pygame.K_BACKSPACE
-# Constantes de boutons de souris
-MOUSE_BUTTON_LEFT = 1
-MOUSE_BUTTON_MIDDLE = 2
-MOUSE_BUTTON_RIGHT = 3

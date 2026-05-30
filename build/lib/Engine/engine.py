@@ -129,9 +129,19 @@ class _Img:
                          0, GL_RGBA, GL_UNSIGNED_BYTE, data)
             self._tex_up = True
 
-    def subsurface(self, u, v, w, h):
+    def subsurface(self, *args):
+        if len(args) == 4:
+            u, v, w, h = args
+        else:
+            u, v, w, h = args[0]
         c = self._pil.crop((u, v, u + w, v + h))
         return _Img(c)
+
+    def set_alpha(self, alpha):
+        r, g, b, a = self._pil.split()
+        a = a.point(lambda _: alpha)
+        self._pil = Image.merge('RGBA', (r, g, b, a))
+        self._tex_up = False
 
 
 # Équivalent Font.render -> _Img
@@ -157,6 +167,11 @@ class _FontWrap:
         img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
         dr = ImageDraw.Draw(img)
         dr.text((0, 0), s, font=self._font, fill=color)
+        if not antialias:
+            # PIL TrueType always anti-aliases; threshold alpha for crisp pixel font
+            r, g, b, a = img.split()
+            a = a.point(lambda x: 255 if x > 127 else 0)
+            img = Image.merge('RGBA', (r, g, b, a))
         return _Img(img)
 
 
@@ -220,6 +235,8 @@ class _Screen:
         glBindTexture(GL_TEXTURE_2D, tex)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                      pil_img.tobytes())
 
@@ -241,9 +258,11 @@ class _Screen:
         glDisable(GL_TEXTURE_2D)
         c = _norm_color(color)
         glColor4f(*c)
-        glPointSize(1.0)
-        glBegin(GL_POINTS)
+        glBegin(GL_QUADS)
         glVertex2i(int(pos[0]), int(pos[1]))
+        glVertex2i(int(pos[0]) + 1, int(pos[1]))
+        glVertex2i(int(pos[0]) + 1, int(pos[1]) + 1)
+        glVertex2i(int(pos[0]), int(pos[1]) + 1)
         glEnd()
         glEnable(GL_TEXTURE_2D)
         glColor4f(1.0, 1.0, 1.0, 1.0)
@@ -394,10 +413,11 @@ class Audio:
 # Graphiques (OpenGL)
 # ----------------------------------------------------------------------
 class Graphics:
-    def __init__(self, width, height, display_scale):
+    def __init__(self, width, height, display_scale, pixel_art=True):
         self._w = width
         self._h = height
         self._scale = display_scale
+        self._pixel_art = pixel_art
         self._camera_x = 0
         self._camera_y = 0
         self._clip_rect = None
@@ -452,6 +472,11 @@ class Graphics:
 
     # --- Primitives ---
     def _draw_quad(self, x, y, w, h, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
         x += self._camera_x
         y += self._camera_y
         c = _norm_color(color)
@@ -467,17 +492,26 @@ class Graphics:
         glColor4f(1, 1, 1, 1)
 
     def _draw_outline(self, x, y, w, h, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
         x += self._camera_x
         y += self._camera_y
         c = _norm_color(color)
         glDisable(GL_TEXTURE_2D)
         glColor4f(*c)
+        if self._pixel_art:
+            glLineWidth(self._scale)
         glBegin(GL_LINE_LOOP)
         glVertex2f(x, y)
         glVertex2f(x + w, y)
         glVertex2f(x + w, y + h)
         glVertex2f(x, y + h)
         glEnd()
+        if self._pixel_art:
+            glLineWidth(1.0)
         glEnable(GL_TEXTURE_2D)
         glColor4f(1, 1, 1, 1)
 
@@ -492,9 +526,11 @@ class Graphics:
         c = _norm_color(color)
         glDisable(GL_TEXTURE_2D)
         glColor4f(*c)
-        glPointSize(1.0)
-        glBegin(GL_POINTS)
+        glBegin(GL_QUADS)
         glVertex2f(x, y)
+        glVertex2f(x + 1, y)
+        glVertex2f(x + 1, y + 1)
+        glVertex2f(x, y + 1)
         glEnd()
         glEnable(GL_TEXTURE_2D)
         glColor4f(1, 1, 1, 1)
@@ -509,13 +545,22 @@ class Graphics:
         return (0, 0, 0, 0)
 
     def line(self, x1, y1, x2, y2, color):
+        if self._pixel_art:
+            x1 = round(x1)
+            y1 = round(y1)
+            x2 = round(x2)
+            y2 = round(y2)
         c = _norm_color(color)
         glDisable(GL_TEXTURE_2D)
         glColor4f(*c)
+        if self._pixel_art:
+            glLineWidth(self._scale)
         glBegin(GL_LINES)
         glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
         glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
         glEnd()
+        if self._pixel_art:
+            glLineWidth(1.0)
         glEnable(GL_TEXTURE_2D)
         glColor4f(1, 1, 1, 1)
 
@@ -526,6 +571,10 @@ class Graphics:
         self._draw_outline(x, y, w, h, color)
 
     def circ(self, x, y, r, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            r = round(r)
         cx = x + self._camera_x
         cy = y + self._camera_y
         c = _norm_color(color)
@@ -543,6 +592,10 @@ class Graphics:
         glColor4f(1, 1, 1, 1)
 
     def circb(self, x, y, r, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            r = round(r)
         cx = x + self._camera_x
         cy = y + self._camera_y
         c = _norm_color(color)
@@ -559,6 +612,11 @@ class Graphics:
         glColor4f(1, 1, 1, 1)
 
     def elli(self, x, y, w, h, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
         cx = x + self._camera_x + w / 2
         cy = y + self._camera_y + h / 2
         c = _norm_color(color)
@@ -576,6 +634,11 @@ class Graphics:
         glColor4f(1, 1, 1, 1)
 
     def ellib(self, x, y, w, h, color):
+        if self._pixel_art:
+            x = round(x)
+            y = round(y)
+            w = round(w)
+            h = round(h)
         cx = x + self._camera_x + w / 2
         cy = y + self._camera_y + h / 2
         c = _norm_color(color)
@@ -592,6 +655,10 @@ class Graphics:
         glColor4f(1, 1, 1, 1)
 
     def tri(self, x1, y1, x2, y2, x3, y3, color):
+        if self._pixel_art:
+            x1 = round(x1); y1 = round(y1)
+            x2 = round(x2); y2 = round(y2)
+            x3 = round(x3); y3 = round(y3)
         c = _norm_color(color)
         glDisable(GL_TEXTURE_2D)
         glColor4f(*c)
@@ -604,14 +671,22 @@ class Graphics:
         glColor4f(1, 1, 1, 1)
 
     def trib(self, x1, y1, x2, y2, x3, y3, color):
+        if self._pixel_art:
+            x1 = round(x1); y1 = round(y1)
+            x2 = round(x2); y2 = round(y2)
+            x3 = round(x3); y3 = round(y3)
         c = _norm_color(color)
         glDisable(GL_TEXTURE_2D)
         glColor4f(*c)
+        if self._pixel_art:
+            glLineWidth(self._scale)
         glBegin(GL_LINE_LOOP)
         glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
         glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
         glVertex2f(x3 + self._camera_x, y3 + self._camera_y)
         glEnd()
+        if self._pixel_art:
+            glLineWidth(1.0)
         glEnable(GL_TEXTURE_2D)
         glColor4f(1, 1, 1, 1)
 
@@ -632,6 +707,10 @@ class Graphics:
         img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
         dr = ImageDraw.Draw(img)
         dr.text((0, 0), s, font=font.font, fill=color)
+        # PIL TrueType always anti-aliases; threshold alpha for crisp pixel font
+        r, g, b, a = img.split()
+        a = a.point(lambda x: 255 if x > 127 else 0)
+        img = Image.merge('RGBA', (r, g, b, a))
 
         tex = self._upload_tex(img)
         dx = x + self._camera_x
@@ -651,8 +730,61 @@ class Graphics:
         dx = x + self._camera_x
         dy = y + self._camera_y
 
+        # Rotation path: use PIL rotation like pygame.transform.rotate()
+        if rotate != 0:
+            # Extract sub-image from source
+            if isinstance(img, _Img):
+                pil_src = img._pil
+            elif isinstance(img, Image.Image):
+                pil_src = img
+            else:
+                return
+            sub = pil_src.crop((u, v, u + w, v + h))
+            sub = sub.rotate(rotate, expand=True, resample=Image.NEAREST)
+
+            # Apply colkey if needed
+            if colkey is not None:
+                if isinstance(colkey, int):
+                    ck = (colkey & 0xFF, (colkey >> 8) & 0xFF, (colkey >> 16) & 0xFF)
+                else:
+                    ck = tuple(colkey[:3])
+                data = sub.load()
+                for py in range(sub.height):
+                    for px in range(sub.width):
+                        p = data[px, py]
+                        if isinstance(p, int):
+                            match = (p & 0xFF, (p >> 8) & 0xFF, (p >> 16) & 0xFF) == ck
+                        else:
+                            match = p[:3] == ck
+                        if match:
+                            data[px, py] = (0, 0, 0, 0)
+
+            tex_id = self._upload_tex(sub)
+            glBindTexture(GL_TEXTURE_2D, tex_id)
+
+            # Center the rotated surface on original center (like pygame)
+            sw, sh = sub.size
+            cx = dx + w / 2
+            cy = dy + h / 2
+            sx = cx - sw / 2
+            sy = cy - sh / 2
+
+            glBegin(GL_QUADS)
+            glTexCoord2f(0, 0); glVertex2f(sx, sy)
+            glTexCoord2f(1, 0); glVertex2f(sx + sw, sy)
+            glTexCoord2f(1, 1); glVertex2f(sx + sw, sy + sh)
+            glTexCoord2f(0, 1); glVertex2f(sx, sy + sh)
+            glEnd()
+            glDeleteTextures(1, [tex_id])
+            return
+
+        # Non-rotated path (unchanged)
         if colkey is not None and isinstance(img, _Img):
-            key = (id(img), u, v, w, h, colkey)
+            if isinstance(colkey, int):
+                ck = (colkey & 0xFF, (colkey >> 8) & 0xFF, (colkey >> 16) & 0xFF)
+            else:
+                ck = tuple(colkey[:3])
+            key = (id(img), u, v, w, h, ck)
             tid = self._colkey_cache.get(key)
             if tid is None:
                 sub = img._pil.crop((u, v, u + w, v + h))
@@ -660,38 +792,33 @@ class Graphics:
                 for py in range(h):
                     for px in range(w):
                         p = data[px, py]
-                        if p[:3] == colkey[:3]:
+                        if isinstance(p, int):
+                            match = (p & 0xFF, (p >> 8) & 0xFF, (p >> 16) & 0xFF) == ck
+                        else:
+                            match = p[:3] == ck
+                        if match:
                             data[px, py] = (0, 0, 0, 0)
                 tid = self._upload_tex(sub)
                 self._colkey_cache[key] = tid
             tex_id, iw, ih = tid, w, h
+            tu1 = 0
+            tv1 = 0
+            tu2 = 1
+            tv2 = 1
         else:
             tex_id, iw, ih = self._tex_of(img)
-
-        tu1 = u / iw if iw > 0 else 0
-        tv1 = v / ih if ih > 0 else 0
-        tu2 = (u + w) / iw if iw > 0 else 1
-        tv2 = (v + h) / ih if ih > 0 else 1
+            tu1 = u / iw if iw > 0 else 0
+            tv1 = v / ih if ih > 0 else 0
+            tu2 = (u + w) / iw if iw > 0 else 1
+            tv2 = (v + h) / ih if ih > 0 else 1
 
         glBindTexture(GL_TEXTURE_2D, tex_id)
-
-        if rotate != 0:
-            cx = dx + w / 2
-            cy = dy + h / 2
-            glPushMatrix()
-            glTranslatef(cx, cy, 0)
-            glRotatef(rotate, 0, 0, 1)
-            glTranslatef(-cx, -cy, 0)
-
         glBegin(GL_QUADS)
         glTexCoord2f(tu1, tv1); glVertex2f(dx, dy)
         glTexCoord2f(tu2, tv1); glVertex2f(dx + w, dy)
         glTexCoord2f(tu2, tv2); glVertex2f(dx + w, dy + h)
         glTexCoord2f(tu1, tv2); glVertex2f(dx, dy + h)
         glEnd()
-
-        if rotate != 0:
-            glPopMatrix()
 
     def bltm(self, x, y, tm, u, v, w, h, colkey=None):
         pass
@@ -714,6 +841,9 @@ class Graphics:
             self._camera_x = 0
             self._camera_y = 0
         else:
+            if self._pixel_art:
+                x = round(x)
+                y = round(y)
             self._camera_x = x
             self._camera_y = y
 
@@ -797,7 +927,7 @@ class Camera:
 # Application principale
 # ----------------------------------------------------------------------
 class App:
-    def __init__(self, width, height, title, fps, display_scale):
+    def __init__(self, width, height, title, fps, display_scale, pixel_art=True):
         if not glfw.init():
             raise RuntimeError("Échec glfw.init()")
 
@@ -825,7 +955,7 @@ class App:
         glfw.swap_interval(0)
 
         self.input = Input(self._window)
-        self.graphics = Graphics(width, height, display_scale)
+        self.graphics = Graphics(width, height, display_scale, pixel_art)
         self.audio = Audio()
         self.resources = Resources()
 
@@ -885,6 +1015,7 @@ _app = None
 _width = 256
 _height = 256
 _global_mouse_pos = (0, 0)
+active_camera = None
 
 graphics = Graphics(256, 256, 1)
 input = Input(None) if False else None  # placeholder
@@ -892,11 +1023,11 @@ resources = Resources()
 audio = Audio()
 
 
-def init(width, height, title="Pyxel Compat", fps=30, display_scale=1):
+def init(width, height, title="Pyxel Compat", fps=30, display_scale=1, pixel_art=True):
     global _app, _width, _height, graphics, input, resources, audio
     _width = width
     _height = height
-    _app = App(width, height, title, fps, display_scale)
+    _app = App(width, height, title, fps, display_scale, pixel_art)
     graphics = _app.graphics
     input = _app.input
     resources = _app.resources

@@ -1,6 +1,6 @@
 import math
 
-import pygame
+from PIL import Image, ImageDraw
 
 from Engine import engine as e
 from Entities.Item import Item
@@ -118,7 +118,8 @@ class Sword(Item):
             if self.is_slashing:
                 progress = 1.0 - (self.slash_timer / self.slash_duration)
                 alpha = int(255 * (1 - progress))
-                surf = pygame.Surface((64, 64), pygame.SRCALPHA)
+                surf = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+                draw = ImageDraw.Draw(surf)
                 
                 center = (32, 32)
                 radius = 12+ progress * 5
@@ -143,16 +144,17 @@ class Sword(Item):
                     points.append((px, py))
                 
                 if len(points) >= 3:
-                    pygame.draw.polygon(surf, (255, 255, 255, (alpha+50)%255), points)
+                    draw.polygon(points, fill=(255, 255, 255, (alpha+50)%255))
                 
                 e.graphics.screen.blit(surf, (self.parent.x + self.parent.w/2 - 32 + e.graphics._camera_x, self.parent.y + self.parent.h/2 - 32 + e.graphics._camera_y))
 
             # Récupération de la portion de l'image
-            sub = self.bank.subsurface((self.w * self.held_pos[0], self.h * self.held_pos[1], self.w, self.h))
+            sub = self.bank.subsurface(self.w * self.held_pos[0], self.h * self.held_pos[1], self.w, self.h)
 
             # On applique le flip horizontal pour refléter le sprite (réalisme)
             if self.flipped:
-                sub = pygame.transform.flip(sub, True, False)
+                sub._pil = sub._pil.transpose(Image.FLIP_LEFT_RIGHT)
+                sub._tex_up = False
 
             # L'angle de dessin doit toujours pointer vers l'extérieur (rotation = pos_angle)
             # Pas besoin de 180° supplémentaire quand flipped car le flip s'occupe déjà de l'effet miroir

@@ -1,4 +1,5 @@
-import pygame
+import sys
+from PIL import Image, ImageDraw
 from Engine import engine as e
 from Entities.Player import Player
 from Entities.World import World
@@ -12,7 +13,7 @@ MAP_MODE = "island"     # "single" (dungeon/cave/island), "island" (noise+biomes
 MAP_BIOME = "dungeon"   # used when MAP_MODE is "single"
 MAP_BIOMES = [ "desert"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
 
-e.init(200, 200, title="Game", fps=60, display_scale=5)
+e.init(200, 200, title="Game", fps=60, display_scale=5, pixel_art=True)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
 sheet1 = e.resources.images[0]
@@ -127,8 +128,7 @@ def draw():
     world.draw()
 
     if cam.flash_alpha > 0:
-        surf = pygame.Surface((e.width(), e.height()), pygame.SRCALPHA)
-        surf.fill((*cam.flash_color, cam.flash_alpha))
+        surf = Image.new('RGBA', (e.width(), e.height()), (*cam.flash_color, cam.flash_alpha))
         e.graphics.screen.blit(surf, (0, 0))
 
     e.camera()

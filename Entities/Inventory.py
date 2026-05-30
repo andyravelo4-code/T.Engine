@@ -1,4 +1,4 @@
-import pygame
+from PIL import Image, ImageDraw
 from Engine import engine as e
 
 
@@ -332,8 +332,7 @@ class Inventory:
         tw, th = ts.get_size()
         tx = min(mx + 8, e.width() - tw - 4)
         ty = max(my - th - 4, 0)
-        bg = pygame.Surface((tw + 6, th + 4), pygame.SRCALPHA)
-        bg.fill(self.TT_BG)
+        bg = Image.new('RGBA', (tw + 6, th + 4), self.TT_BG)
         e.graphics.screen.blit(bg, (tx - 3, ty - 2))
         e.graphics.screen.blit(ts, (tx, ty))
 

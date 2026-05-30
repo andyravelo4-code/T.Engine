@@ -1,12 +1,12 @@
-# Tiavina.engine
+# Tiavina.engine.gl
 
-Moteur de jeu 2D pixel art, construit sur **Pygame**.  
+Moteur de jeu 2D pixel art, construit sur **PyOpenGL + GLFW + Pillow**.  
 Fonctionne avec un **écran virtuel** (résolution logique) mis à l'échelle entière vers la fenêtre d'affichage.
 
 ## Installation
 
 ```bash
-pip install Tiavina.engine
+pip install Tiavina.engine.gl
 ```
 
 ```python
@@ -69,17 +69,17 @@ Le moteur expose une API **globale** : on importe `from Engine import engine as 
 
 Sous le capot :
 
-- **`App`** — classe principale qui gère la fenêtre Pygame, l'horloge FPS, le `virtual_screen` (Surface logique), et la boucle d'événements.
-- **`Graphics`** — dessin sur l'écran virtuel avec support de caméra, clipping, et alpha.
-- **`Input`** — gestion clavier, souris, joystick.
-- **`Resources`** — chargement d'images, sons, musiques.
-- **`Audio`** — lecture son/musique via les canaux Pygame.
+- **`App`** — classe principale qui gère la fenêtre GLFW, l'horloge FPS, le `virtual_screen` (PIL Image logique), et la boucle d'événements.
+- **`Graphics`** — dessin sur l'écran virtuel avec support de caméra, clipping, et alpha. OpenGL est utilisé pour le blit final sur l'écran physique.
+- **`Input`** — gestion clavier et souris via GLFW.
+- **`Resources`** — chargement d'images.
+- **`Audio`** — **stub** (non implémenté, retourne `None`).
 
 ---
 
 ## Initialisation
 
-### `e.init(width, height, title="T.engine", fps=30, display_scale=1)`
+### `e.init(width, height, title="T.engine", fps=30, display_scale=1, pixel_art=True)`
 
 Crée la fenêtre et initialise tous les sous-systèmes.
 
@@ -90,6 +90,9 @@ Crée la fenêtre et initialise tous les sous-systèmes.
 | `title` | `str` | Titre de la fenêtre |
 | `fps` | `int` | Images par seconde cibles |
 | `display_scale` | `int` | Facteur d'échelle entier (ex: 5 → fenêtre 1000×1000 pour 200×200) |
+| `pixel_art` | `bool` | `True` = arrondit caméra et coordonnées, ligne 1px logique → `display_scale` px physiques (défaut: `True`) |
+
+Quand `pixel_art=True`, la caméra est arrondie aux entiers, les positions de dessin sont arrondies aux entiers, et `glLineWidth(display_scale)` est utilisé pour les lignes de 1px logique. Mettre à `False` pour un rendu haute résolution sans ces contraintes.
 
 L'écran virtuel fait `width × height` pixels. Chaque frame, il est scaled par `display_scale` et affiché dans la fenêtre système.
 
@@ -166,7 +169,7 @@ blt(x, y, img, u, v, w, h, colkey=None, rotate=0)
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `x, y` | `int` | Position de destination (coin supérieur gauche) |
-| `img` | `pygame.Surface` | Image source |
+| `img` | `PIL.Image` ou `_Img` | Image source |
 | `u, v` | `int` | Coordonnées source (coin supérieur gauche dans l'image) |
 | `w, h` | `int` | Dimensions de la région source |
 | `colkey` | `Color` ou `None` | Couleur de transparence (optionnelle) |
@@ -188,7 +191,7 @@ text(x, y, s, color, font=None)
 | `x, y` | `int` | Position |
 | `s` | `str` | Texte à afficher |
 | `color` | `tuple` | Couleur RGB (pas de support alpha) |
-| `font` | `pygame.Font` ou `None` | Police personnalisée (None = police pixel par défaut) |
+| `font` | `FontWrap` ou `None` | Police personnalisée (None = police pixel par défaut) |
 
 La police par défaut est **PressStart2P.ttf** taille 6px, rendu **sans anti-aliasing** pour un aspect pixel art.
 
@@ -266,9 +269,8 @@ Le flash doit être dessiné manuellement dans `draw()` :
 
 ```python
 if cam.flash_alpha > 0:
-    surf = pygame.Surface((e.width(), e.height()), pygame.SRCALPHA)
-    surf.fill((*cam.flash_color, cam.flash_alpha))
-    e.graphics.screen.blit(surf, (0, 0))
+    e.camera()
+    e.rect(0, 0, e.width(), e.height(), (*cam.flash_color, cam.flash_alpha))
 ```
 
 ---
@@ -309,22 +311,14 @@ if e.mouse_btnp(e.MOUSE_BUTTON_LEFT):
 
 ### Joystick
 
-```python
-joy(joy_id, button)       # → True si le bouton du joystick est pressé
-joy_axis(joy_id, axis)    # → Valeur de l'axe (-1.0 à 1.0)
-```
-
-Les joysticks sont détectés et initialisés automatiquement au lancement.
+Non implémenté dans `Tiavina.engine.gl` (stub).
 
 ---
 
 ## Ressources — `Resources`
 
 ```python
-resources.image(bank, path, colkey=None)   # → pygame.Surface ou None
-resources.sound(bank, path)                # → pygame.mixer.Sound ou None
-resources.music(bank, path)                # → None (enregistre le chemin)
-resources.tilemap(bank)                    # → None (non implémenté)
+resources.image(bank, path, colkey=None)   # → PIL.Image ou None
 resources.load(filename)                   # → lève NotImplementedError
 ```
 
@@ -335,6 +329,7 @@ resources.load(filename)                   # → lève NotImplementedError
 - `bank` : index numérique (`int`)
 - `path` : chemin relatif ou absolu
 - `colkey` : couleur de transparence optionnelle (ex: `(255, 0, 255)`)
+- Retourne une `PIL.Image` (convertie en RGBA)
 
 ```python
 e.resources.image(0, "./sprites/player.png")
@@ -344,48 +339,28 @@ e.resources.image(1, "./sprites/tiles.png", (255, 0, 255))
 img = e.resources.images[1]
 ```
 
-### Sons
-
-```python
-e.resources.sound(0, "./sfx/jump.wav")
-e.audio.play(0, 0)         # joue sur le canal 0
-```
-
 ---
 
 ## Audio — `Audio`
 
-8 canaux (0–7) pour les effets sonores, 1 flux pour la musique.
-
-```python
-audio.play(channel, sound_key, loop=False)       # joue un son
-audio.playm(music_key, loop=False)               # joue une musique
-audio.stop(channel=None)                         # stop (tout si channel=None)
-audio.play_pos(channel)                          # → True si le canal est actif
-```
-
-```python
-e.audio.play(2, 0)                 # son index 0 sur canal 2
-e.audio.playm("boss_music")        # musique
-e.audio.stop()                     # coupe tout
-```
+**Non implémenté dans `Tiavina.engine.gl`.** Les méthodes sont des stubs (retournent `None` sans erreur).
 
 ---
 
 ## Police pixel — `default_font`
 
 ```python
-default_font(size=6) → pygame.Font
+default_font(size=6, antialias=False) → FontWrap
 ```
 
-Charge et met en cache la police **PressStart2P.ttf**.  
-Si le fichier TTF est introuvable, tombe sur `pygame.font.Font(None, size)`.
+Charge et met en cache la police **PressStart2P.ttf** via Pillow (`ImageFont.truetype`).  
+L'anti-aliasing est désactivé par défaut pour un rendu pixel art.
 
 La police est stockée dans un cache global `_pixel_font_cache` : chaque taille n'est chargée qu'une fois.
 
 ```python
 petite = e.default_font(6)
-moyenne = e.default_font(8)
+moyenne = e.default_font(8, antialias=True)   # avec lissage
 grande  = e.default_font(16)
 ```
 
@@ -401,7 +376,7 @@ grande  = e.default_font(16)
 `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`,
 `KEY_LALT`, `KEY_RALT`
 
-Toutes sont des constantes Pygame (`pygame.K_*`) réexportées par le module.
+Toutes sont des constantes GLFW (`glfw.KEY_*`) réexportées par le module.
 
 ### Boutons souris
 
@@ -450,12 +425,12 @@ Le module `engine` expose des fonctions globales qui délèguent aux sous-systè
 ## Exemple complet
 
 ```python
-import pygame
 from Engine import engine as e
 from random import randint
 
 # ── Initialisation ─────────────────────────────────────
-e.init(200, 200, "Aventurier", fps=60, display_scale=5)
+e.init(200, 200, "Aventurier", fps=60, display_scale=5,
+       pixel_art=True)
 
 # ── Ressources ─────────────────────────────────────────
 e.resources.image(0, "./sprites/player.png")
@@ -507,9 +482,9 @@ def draw():
 
     # Flash overlay (dessiné avant la réinitialisation caméra)
     if cam.flash_alpha > 0:
-        surf = pygame.Surface((e.width(), e.height()), pygame.SRCALPHA)
-        surf.fill((*cam.flash_color, cam.flash_alpha))
-        e.graphics.screen.blit(surf, (0, 0))
+        e.camera()
+        e.rect(0, 0, e.width(), e.height(),
+               (*cam.flash_color, cam.flash_alpha))
 
     # ── HUD (coordonnées écran) ──
     e.camera()  # ← réinitialise la caméra
