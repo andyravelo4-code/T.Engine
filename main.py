@@ -8,6 +8,7 @@ from Entities.Inventory import Inventory
 from Items.Sword import Sword
 from Items.Crossbow import Crossbow
 from Items.Consumable import Consumable
+from Entities.Chest import Chest
 
 MAP_MODE = "island"     # "single" (dungeon/cave/island), "island" (noise+biomes), "surface" (noise+biomes), "multi" (stripes)
 MAP_BIOME = "dungeon"   # used when MAP_MODE is "single"
@@ -40,8 +41,16 @@ frames_dict2 = {
     "walk_left": (0, 1), "walk_right": (0, 0),
     "bank":stuff,
 }
-
+frames_dict3 = {
+    "image_x":12, "image_y":0, "shadow": (-12, 0),
+    "idle_up": (0, 6), "idle_down": (0, 7),
+    "idle_left": (0, 5), "idle_right": (0, 4),
+    "walk_up": (0, 2), "walk_down": (0, 3),
+    "walk_left": (0, 1), "walk_right": (0, 0),
+    "bank":stuff,
+}
 game_map = Map(world)
+world.map = game_map
 if MAP_MODE == "single":
     game_map.generate(
         MAP_BIOME, 20, 20,
@@ -59,16 +68,22 @@ if MAP_MODE == "single":
 elif MAP_MODE == "island":
     game_map.generate_island(
         MAP_BIOMES, 20, 20,
-        npc_count=4, player=player,
+        npc_count=6, player=player,
         npc_configs=[
-            {"frames_dict": frames_dict, "max_health": 80, "speed": 0.6, "punch_damage": 4, "punch_cooldown": 40},
-            {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 20, "punch_damage": 8, "punch_cooldown": 50},
+            {"frames_dict": frames_dict, "max_health": 80, "speed": 0.5, "punch_damage": 4, "punch_cooldown": 40},
+            {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.5, "detection_radius": 40, "punch_damage": 8, "punch_cooldown": 50},
+            {"frames_dict": frames_dict3, "aggressive": False, "max_health": 50, "speed": 0.3},
         ],
         item_configs=[
             {"cls": Sword,"name":"excalibour", "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
             {"cls": Crossbow,"name":"crossbrow", "bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable,"name":"wisky", "bank": stuff, "heal_amount": 15, "dropped_pos": (1, 0), "count": 3},
-            {"cls": Consumable,"name":"pomme", "bank": stuff, "heal_amount": 15, "dropped_pos": (2, 0), "count": 2}
+            {"cls": Consumable,"name":"pomme", "bank": stuff, "heal_amount": 15, "dropped_pos": (2, 0), "count": 2},
+            {"cls": Chest, "bank": stuff, "image_x": 0, "image_y": 5, "placed_pos": (5, 10), "count": 1,
+             "items": [
+                 {"cls": Sword, "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "name": "Excalibour"},
+                 {"cls": Consumable, "bank": stuff, "name": "Potion", "heal_amount": 20, "dropped_pos": (0, 0)},
+             ]},
         ],
     )
 elif MAP_MODE == "surface":

@@ -2,6 +2,7 @@ import random
 import math
 from Entities.Block import Block
 from Entities.Npc import Npc
+from Entities.Chest import Chest
 from Items.Sword import Sword
 from Items.Crossbow import Crossbow
 
@@ -669,21 +670,46 @@ class Map:
                 cls = cfg["cls"]
                 bank = cfg["bank"]
                 count = cfg.get("count", 1)
-                item_kwargs = {k: v for k, v in cfg.items() if k not in ("cls", "bank", "count","name")}
-                for _ in range(count):
-                    for _ in range(500):
-                        x = random.randint(2, self.width - 3)
-                        y = random.randint(2, self.height - 3)
-                        if self._is_walkable(self.grid[y][x], x, y):
-                            item = cls(
-                                x * self.tile_size, y * self.tile_size,
+                placed_pos = cfg.get("placed_pos")
+                if cls is Chest:
+                    for _ in range(count):
+                        if placed_pos is not None:
+                            candidates = [(placed_pos[0], placed_pos[1])]
+                        else:
+                            candidates = []
+                            for _ in range(500):
+                                rx = random.randint(2, self.width - 3)
+                                ry = random.randint(2, self.height - 3)
+                                if self._is_walkable(self.grid[ry][rx], rx, ry):
+                                    candidates.append((rx, ry))
+                                    break
+                        for px, py in candidates:
+                            chest = Chest(
+                                px * self.tile_size, py * self.tile_size,
                                 self.tile_size, self.tile_size,
-                                bank,name=cfg["name"], **item_kwargs
+                                bank,
+                                image_x=cfg.get("image_x", 0),
+                                image_y=cfg.get("image_y", 0),
+                                items=cfg.get("items", []),
+                                color=cfg.get("color"),
                             )
-                            if hasattr(item, "world"):
-                                item.world = self.world
-                            self.world.add(item)
-                            break
+                            self.world.add(chest)
+                else:
+                    item_kwargs = {k: v for k, v in cfg.items() if k not in ("cls", "bank", "count", "name")}
+                    for _ in range(count):
+                        for _ in range(500):
+                            x = random.randint(2, self.width - 3)
+                            y = random.randint(2, self.height - 3)
+                            if self._is_walkable(self.grid[y][x], x, y):
+                                item = cls(
+                                    x * self.tile_size, y * self.tile_size,
+                                    self.tile_size, self.tile_size,
+                                    bank, name=cfg["name"], **item_kwargs
+                                )
+                                if hasattr(item, "world"):
+                                    item.world = self.world
+                                self.world.add(item)
+                                break
         elif img:
             for cls in (Sword, Crossbow, Crossbow):
                 for _ in range(500):

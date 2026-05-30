@@ -105,7 +105,7 @@ class Inventory:
 
         shiftp = e.btn(e.KEY_LSHIFT) or e.btn(e.KEY_RSHIFT)
         ep = e.btnp(e.KEY_E) and not self._prev_key_e
-        rp = e.btnp(e.KEY_R) and not self._prev_rbtn
+        rp = e.btnp(e.KEY_R) and not self._prev_key_r
 
         all_rects = eqr + cr + [(ox, oy, self.OUT_W, self.OUT_H)] + sr
         self.hovered = -1

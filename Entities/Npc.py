@@ -1,5 +1,6 @@
 import heapq
 import math
+import random
 
 from PIL import Image, ImageDraw
 
@@ -11,7 +12,7 @@ class Npc(Object):
     def __init__(
         self, x, y, w, h, target, frames_dict, world,
         aggressive=True, max_health=100,
-        speed=0.5, detection_radius=20, attack_radius=8,
+        speed=0.3, detection_radius=20, attack_radius=10,
         punch_damage=5, punch_duration=10, punch_cooldown=40,
     ):
         super().__init__(x, y, w, h, frames_dict["bank"])
@@ -41,6 +42,22 @@ class Npc(Object):
         self.punch_cooldown = punch_cooldown
         self.hit_entities = []
 
+        # Non-aggressive behavior
+        self._behavior_timer = 0
+        self._idle_timer = 0
+        self._wander_target = None
+        self._hit_flee_timer = 0
+        self._aggro = False
+        self._target_x = None
+        self._target_y = None
+        self.velocity_x = 0.0
+        self.velocity_y = 0.0
+        self._rem_x = 0.0
+        self._rem_y = 0.0
+        self.acceleration = 0.15
+        self.friction = 0.85
+        self.max_speed = 1.2
+
     def get_grid_pos(self, x, y):
         # We assume 8x8 grid cells for pathfinding
         return int(round(x) // 8), int(round(y) // 8)
@@ -51,13 +68,19 @@ class Npc(Object):
     def a_star(self, start_pos, goal_pos, world):
         start = self.get_grid_pos(*start_pos)
         goal = self.get_grid_pos(*goal_pos)
+        map_entity = getattr(world, "map", None)
 
         # Borne la zone de recherche pour éviter l'explosion infinie
         pad = 30
-        min_x = min(start[0], goal[0]) - pad
-        max_x = max(start[0], goal[0]) + pad
-        min_y = min(start[1], goal[1]) - pad
-        max_y = max(start[1], goal[1]) + pad
+        min_x = max(0, min(start[0], goal[0]) - pad)
+        max_x = min(map_entity.width - 1, max(start[0], goal[0]) + pad) if map_entity else max(start[0], goal[0]) + pad
+        min_y = max(0, min(start[1], goal[1]) - pad)
+        max_y = min(map_entity.height - 1, max(start[1], goal[1]) + pad) if map_entity else max(start[1], goal[1]) + pad
+
+        # Clamp goal to map bounds
+        if map_entity:
+            goal = (max(0, min(goal[0], map_entity.width - 1)),
+                    max(0, min(goal[1], map_entity.height - 1)))
 
         frontier = []
         heapq.heappush(frontier, (0, start))
@@ -87,6 +110,14 @@ class Npc(Object):
                 if not (min_x <= next_node[0] <= max_x and min_y <= next_node[1] <= max_y):
                     continue
 
+                # Skip unwalkable map tiles
+                if map_entity:
+                    if not (0 <= next_node[1] < map_entity.height and 0 <= next_node[0] < map_entity.width):
+                        continue
+                    tile = map_entity.grid[next_node[1]][next_node[0]]
+                    if not map_entity._is_walkable(tile, next_node[0], next_node[1]):
+                        continue
+
                 new_cost = cost_so_far[current] + 1
                 if next_node not in cost_so_far or new_cost < cost_so_far[next_node]:
                     cost_so_far[next_node] = new_cost
@@ -105,6 +136,15 @@ class Npc(Object):
 
         path.reverse()
         return path
+
+    def take_damage(self, amount, world):
+        if self.aggressive:
+            self._aggro = True
+        else:
+            self._hit_flee_timer = 30
+            self.path = []
+            self._behavior_timer = 0
+        super().take_damage(amount, world)
 
     def draw(self):
         # Draw shadow
@@ -176,8 +216,8 @@ class Npc(Object):
         if not world:
             return
 
-        # Interaction with items
-        if not self.current_item:
+        # Interaction with items — only aggressive NPCs pick up items
+        if self.aggressive and not self.current_item:
             from Entities.Item import Item
 
             for obj in list(world.entities):
@@ -192,7 +232,8 @@ class Npc(Object):
                         world.remove(obj)
                         break
         else:
-            self.current_item.update()
+            if self.aggressive and self.current_item:
+                self.current_item.update()
 
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
@@ -207,7 +248,50 @@ class Npc(Object):
         if isinstance(self.current_item, Crossbow):
             current_attack_radius = 60
 
-        if self.aggressive and dist < current_attack_radius:
+        if self.aggressive:
+            self._update_aggressive(dist, current_attack_radius)
+        else:
+            self._update_passive()
+
+        super().update()
+
+    def _update_aggressive(self, dist, current_attack_radius):
+        world = self.world
+
+        if self._aggro:
+            if dist < current_attack_radius:
+                self.state = "attack"
+                self._face_target()
+                if self.attack_cooldown <= 0:
+                    if self.current_item:
+                        if hasattr(self.current_item, "slash") and not getattr(
+                            self.current_item, "is_slashing", False
+                        ):
+                            self.current_item.slash()
+                            self.attack_cooldown = getattr(self.current_item, "cooldown", 20)
+                        elif hasattr(self.current_item, "fire") and not getattr(
+                            self.current_item, "is_firing", False
+                        ):
+                            angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
+                            self.current_item.fire(angle)
+                            self.attack_cooldown = getattr(self.current_item, "cooldown", 30)
+                    elif not self.is_punching:
+                        self.is_punching = True
+                        self.punch_timer = self.punch_duration
+                        self.hit_entities = []
+                        self.punch_angle = math.atan2(
+                            self.target.y - (self.y + self.h/2),
+                            self.target.x - (self.x + self.w/2)
+                        )
+                        self.attack_cooldown = self.punch_cooldown
+            else:
+                self.state = "chase"
+                self._follow_path(self.target.x, self.target.y)
+            if self.is_punching:
+                self._update_punch()
+            return
+
+        if dist < current_attack_radius:
             self.state = "attack" if world.active_npc is self else "idle"
             if self.state == "attack":
                 self._face_target()
@@ -237,79 +321,289 @@ class Npc(Object):
                 self.path = []
 
         if self.is_punching:
-            self.punch_timer -= 1
-            for entity in world.entities:
-                if entity is self or not hasattr(entity, 'take_damage'):
-                    continue
-                if not entity.is_living and not getattr(entity, 'blocking', False):
-                    continue
-                p_dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
-                if p_dist < 18 and entity not in self.hit_entities:
-                    angle_to_entity = math.atan2(entity.y + entity.h/2 - (self.y + self.h/2), entity.x + entity.w/2 - (self.x + self.w/2))
-                    angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
-                    if abs(angle_diff) < math.radians(90):
-                        self.hit_entities.append(entity)
-                        entity.take_damage(self.punch_damage, self.world)
-            if self.punch_timer <= 0:
-                self.is_punching = False
-        elif self.aggressive and dist < self.detection_radius:
+            self._update_punch()
+        elif dist < self.detection_radius:
             self.state = "chase" if world.active_npc is self else "idle"
             if self.state == "chase":
-                self.path_timer -= 1
-                if self.path_timer <= 0:
-                    start_pos = (self.path[0][0]*8, self.path[0][1]*8) if self.path else (self.x, self.y)
-                    new_path = self.a_star(start_pos, (self.target.x, self.target.y), world)
-                    if self.path and new_path:
-                        if new_path[0] == self.path[0]:
-                            new_path.pop(0)
-                        self.path = [self.path[0]] + new_path
-                    else:
-                        self.path = new_path
-                    self.path_timer = self.path_delay
-
-                if self.path:
-                    next_node = self.path[0]
-                    target_x = next_node[0] * 8
-                    target_y = next_node[1] * 8
-
-                    dx = target_x - self.x
-                    dy = target_y - self.y
-                    dist_to_node = math.hypot(dx, dy)
-
-                    if dist_to_node <= self.speed or dist_to_node < 0.01:
-                        self.x = target_x
-                        self.y = target_y
-                        self.path.pop(0)
-                    else:
-                        move_x = (dx / dist_to_node) * self.speed
-                        move_y = (dy / dist_to_node) * self.speed
-                        self.x += move_x
-                        self.y += move_y
-
-                        if abs(move_x) > abs(move_y):
-                            if move_x > 0:
-                                self.direction = "right"
-                            else:
-                                self.direction = "left"
-                        else:
-                            if move_y > 0:
-                                self.direction = "down"
-                            else:
-                                self.direction = "up"
-                                
-                        if e.frame_count() % 5 == 0:
-                            try:
-                                from Entities.Particle import spawn_dust
-                                spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
-                            except ImportError:
-                                pass
+                self._follow_path(self.target.x, self.target.y)
             if self.state == "idle":
                 self.path = []
         else:
             self.state = "idle"
             self.path = []
 
-        super().update()
+    def _update_passive(self):
+        world = self.world
+
+        # Hit reaction — flee briefly
+        if self._hit_flee_timer > 0:
+            self._hit_flee_timer -= 1
+            self.state = "flee"
+            self._target_x = self.x + random.randint(-60, 60)
+            self._target_y = self.y + random.randint(-60, 60)
+            self._move_smoothly(self._target_x, self._target_y)
+            return
+
+        # Flee from aggressive NPCs (priority)
+        nearest_threat = None
+        nearest_threat_dist = float("inf")
+        for entity in world.entities:
+            if entity is self:
+                continue
+            if getattr(entity, "aggressive", False) and entity is not self.target:
+                d = math.hypot(entity.x - self.x, entity.y - self.y)
+                if d < nearest_threat_dist:
+                    nearest_threat_dist = d
+                    nearest_threat = entity
+
+        if nearest_threat and nearest_threat_dist < self.detection_radius:
+            self.state = "flee"
+            self._target_x = self.x - (nearest_threat.x - self.x) * 3
+            self._target_y = self.y - (nearest_threat.y - self.y) * 3
+            self._move_smoothly(self._target_x, self._target_y)
+            return
+
+        # Pick a new behavior
+        self._behavior_timer -= 1
+        if self._behavior_timer <= 0:
+            roll = random.random()
+            if roll < 0.30:
+                self.state = "flee"
+                self._behavior_timer = random.randint(20, 50)
+                self._target_x = self.x + random.randint(-120, 120)
+                self._target_y = self.y + random.randint(-120, 120)
+            elif roll < 0.50:
+                self.state = "idle"
+                self._idle_timer = random.randint(15, 45)
+                self._behavior_timer = self._idle_timer
+                dirs = ["up", "down", "left", "right"]
+                self.last_dir = random.choice(dirs)
+                self.velocity_x = 0
+                self.velocity_y = 0
+            else:
+                self.state = "walk"
+                self._behavior_timer = random.randint(30, 90)
+                self._target_x = self.x + random.randint(-80, 80)
+                self._target_y = self.y + random.randint(-80, 80)
+
+        # Execute current behavior every frame
+        if self.state == "idle":
+            self._idle_timer -= 1
+            self.velocity_x *= self.friction
+            self.velocity_y *= self.friction
+            if abs(self.velocity_x) < 0.02:
+                self.velocity_x = 0
+            if abs(self.velocity_y) < 0.02:
+                self.velocity_y = 0
+            self._apply_velocity()
+            if self._idle_timer <= 0:
+                self._behavior_timer = 0
+        elif self.state in ("flee", "walk"):
+            self._move_smoothly(self._target_x, self._target_y)
+            if math.hypot(self._target_x - self.x, self._target_y - self.y) < 8:
+                self._behavior_timer = 0
+
+    def _follow_path(self, target_x, target_y):
+        world = self.world
+        dist = math.hypot(target_x - self.x, target_y - self.y)
+        if dist < 8:
+            self.path = []
+            return
+
+        self.path_timer -= 1
+        if self.path_timer <= 0 or not self.path:
+            start_pos = (self.path[0][0]*8, self.path[0][1]*8) if self.path else (self.x, self.y)
+            new_path = self.a_star(start_pos, (target_x, target_y), world)
+            if self.path and new_path:
+                if new_path[0] == self.path[0]:
+                    new_path.pop(0)
+                self.path = [self.path[0]] + new_path
+            else:
+                self.path = new_path
+            self.path_timer = self.path_delay
+
+        if self.path:
+            next_node = self.path[0]
+            nx = next_node[0] * 8
+            ny = next_node[1] * 8
+            dx = nx - self.x
+            dy = ny - self.y
+            nd = math.hypot(dx, dy)
+            map_w, map_h = self._map_bounds(world)
+            if nd <= self.speed or nd < 0.01:
+                self.x = max(0, min(nx, map_w - self.w))
+                self.y = max(0, min(ny, map_h - self.h))
+                self.path.pop(0)
+            else:
+                self.x = max(0, min(self.x + (dx / nd) * self.speed, map_w - self.w))
+                self.y = max(0, min(self.y + (dy / nd) * self.speed, map_h - self.h))
+                if abs(dx) > abs(dy):
+                    self.direction = "right" if dx > 0 else "left"
+                else:
+                    self.direction = "down" if dy > 0 else "up"
+                if e.frame_count() % 5 == 0:
+                    try:
+                        from Entities.Particle import spawn_dust
+                        spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
+                    except ImportError:
+                        pass
+
+    def _move_smoothly(self, target_x, target_y):
+        """Steer smoothly toward a target point with obstacle/entity avoidance."""
+        world = self.world
+
+        # Clamp target to map bounds
+        map_entity = getattr(world, "map", None)
+        if map_entity:
+            margin = 4
+            target_x = max(margin, min(target_x, map_entity.width * 8 - self.w - margin))
+            target_y = max(margin, min(target_y, map_entity.height * 8 - self.h - margin))
+
+        dx = target_x - self.x
+        dy = target_y - self.y
+        dist = math.hypot(dx, dy)
+
+        if dist < 4:
+            self.velocity_x *= 0.5
+            self.velocity_y *= 0.5
+            if dist < 1:
+                self.velocity_x = 0
+                self.velocity_y = 0
+                self.state = "idle"
+                return
+
+        # Accelerate toward target (4-directional)
+        if dist > 0:
+            if abs(dx) > abs(dy):
+                self.velocity_x += (1 if dx > 0 else -1) * self.acceleration
+                self.velocity_y *= 0.9
+            else:
+                self.velocity_y += (1 if dy > 0 else -1) * self.acceleration
+                self.velocity_x *= 0.9
+
+        # Entity avoidance — repulsion from nearby blocking entities
+        for entity in world.entities:
+            if entity is self or entity is self.target:
+                continue
+            if not getattr(entity, "blocking", False) and not isinstance(entity, Npc):
+                continue
+            ex = entity.x + entity.w / 2
+            ey = entity.y + entity.h / 2
+            sx = self.x + self.w / 2
+            sy = self.y + self.h / 2
+            edx = sx - ex
+            edy = sy - ey
+            edist = math.hypot(edx, edy)
+            if 0 < edist < 12:
+                force = (12 - edist) / 12 * 0.3
+                self.velocity_x += (edx / edist) * force
+                self.velocity_y += (edy / edist) * force
+
+        # Friction
+        self.velocity_x *= self.friction
+        self.velocity_y *= self.friction
+
+        # Clamp speed
+        speed = math.hypot(self.velocity_x, self.velocity_y)
+        if speed > self.max_speed:
+            ratio = self.max_speed / speed
+            self.velocity_x *= ratio
+            self.velocity_y *= ratio
+
+        if abs(self.velocity_x) < 0.02:
+            self.velocity_x = 0.0
+        if abs(self.velocity_y) < 0.02:
+            self.velocity_y = 0.0
+
+        # Set direction from velocity — 4-directional, zero out other axis
+        if speed > 0.1:
+            if abs(self.velocity_x) > abs(self.velocity_y):
+                self.direction = "right" if self.velocity_x > 0 else "left"
+                self.velocity_y = 0
+            else:
+                self.direction = "down" if self.velocity_y > 0 else "up"
+                self.velocity_x = 0
+
+        # Apply movement
+        self._apply_velocity()
+
+        if speed > 0.5 and e.frame_count() % 7 == 0:
+            try:
+                from Entities.Particle import spawn_dust
+                spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)
+            except ImportError:
+                pass
+
+    def _map_bounds(self, world):
+        map_entity = getattr(world, "map", None)
+        if map_entity:
+            return map_entity.width * 8, map_entity.height * 8
+        return 999999, 999999
+
+    def _apply_velocity(self):
+        """Apply velocity with remainder accumulation, collision, and map bounds clamping."""
+        world = self.world
+        map_w, map_h = self._map_bounds(world)
+
+        self._rem_x += self.velocity_x
+        self._rem_y += self.velocity_y
+        dx_step = int(self._rem_x)
+        dy_step = int(self._rem_y)
+        self._rem_x -= dx_step
+        self._rem_y -= dy_step
+
+        if dx_step != 0:
+            nx = self.x + dx_step
+            nx = max(0, min(nx, map_w - self.w))
+            if not self._collides_at(nx, self.y, world):
+                self.x = nx
+            else:
+                self.velocity_x = 0
+
+        if dy_step != 0:
+            ny = self.y + dy_step
+            ny = max(0, min(ny, map_h - self.h))
+            if not self._collides_at(self.x, ny, world):
+                self.y = ny
+            else:
+                self.velocity_y = 0
+
+    def _collides_at(self, x, y, world):
+        """Check if position collides with blocking tiles or entities."""
+        # Check map tiles
+        map_entity = getattr(world, "map", None)
+        if map_entity:
+            gx = int((x + self.w / 2) // 8)
+            gy = int((y + self.h / 2) // 8)
+            if 0 <= gy < map_entity.height and 0 <= gx < map_entity.width:
+                if not map_entity._is_walkable(map_entity.grid[gy][gx], gx, gy):
+                    return True
+        # Check blocking entities
+        for entity in world.entities:
+            if entity is self:
+                continue
+            if getattr(entity, "blocking", False):
+                if (x < entity.x + entity.w and x + self.w > entity.x and
+                    y < entity.y + entity.h and y + self.h > entity.y):
+                    return True
+        return False
+
+    def _update_punch(self):
+        self.punch_timer -= 1
+        for entity in self.world.entities:
+            if entity is self or not hasattr(entity, 'take_damage'):
+                continue
+            if not entity.is_living and not getattr(entity, 'blocking', False):
+                continue
+            p_dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
+            if p_dist < 18 and entity not in self.hit_entities:
+                angle_to_entity = math.atan2(entity.y + entity.h/2 - (self.y + self.h/2), entity.x + entity.w/2 - (self.x + self.w/2))
+                angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
+                if abs(angle_diff) < math.radians(90):
+                    self.hit_entities.append(entity)
+                    entity.take_damage(self.punch_damage, self.world)
+        if self.punch_timer <= 0:
+            self.is_punching = False
 
     def _face_target(self):
         dx = self.target.x - self.x

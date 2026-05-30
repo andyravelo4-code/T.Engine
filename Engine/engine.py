@@ -79,8 +79,8 @@ KEY_TAB = glfw.KEY_TAB
 KEY_BACKSPACE = glfw.KEY_BACKSPACE
 
 MOUSE_BUTTON_LEFT = 1
-MOUSE_BUTTON_MIDDLE = 2
-MOUSE_BUTTON_RIGHT = 3
+MOUSE_BUTTON_RIGHT = 2
+MOUSE_BUTTON_MIDDLE = 3
 
 # ----------------------------------------------------------------------
 # Couleur
