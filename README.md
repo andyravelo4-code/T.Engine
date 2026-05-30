@@ -1,82 +1,137 @@
-# Engine — 2D Game Engine (Pygame Backend)
+# Engine — Documentation Complète
 
-Un moteur de jeu 2D léger, compatible avec l'API Pyxel, construit sur **Pygame**.
-Utilise un **écran virtuel** avec mise à l'échelle entière, un système de caméra avec shake et flash, la gestion des entrées (clavier, souris, joystick), l'audio et la gestion de ressources, supprote l'acceleration graphique .
+Moteur de jeu 2D compatible Pyxel, construit sur **Pygame**.  
+Fonctionne avec un **écran virtuel** (résolution logique) mis à l'échelle entière vers la fenêtre d'affichage.
 
-## Utilisation minimale
+---
+
+## Table des matières
+
+- [Architecture](#architecture)
+- [Initialisation](#initialisation)
+- [Boucle principale](#boucle-principale)
+- [Graphismes — `Graphics`](#graphismes--graphics)
+  - [Primitives de dessin](#primitives-de-dessin)
+  - [Couleurs avec alpha (RGBA)](#couleurs-avec-alpha-rgba)
+  - [Blit d'image](#blit-dimage)
+  - [Texte](#texte)
+  - [Caméra](#caméra)
+  - [Clipping](#clipping)
+- [Caméra intelligente — `Camera`](#caméra-intelligente--camera)
+- [Entrées — `Input`](#entrées--input)
+  - [Clavier](#clavier)
+  - [Souris](#souris)
+  - [Joystick](#joystick)
+- [Ressources — `Resources`](#ressources--resources)
+- [Audio — `Audio`](#audio--audio)
+- [Police pixel — `default_font`](#police-pixel--default_font)
+- [Constantes](#constantes)
+- [Fonctions globales](#fonctions-globales)
+- [Exemple complet](#exemple-complet)
+
+---
+
+## Architecture
+
+```
+Engine/
+└── engine.py          ← le moteur (tout-en-un)
+assests/
+└── fonts/
+    └── PressStart2P.ttf   ← police pixel par défaut
+```
+
+Le moteur expose une API **globale** (comme Pyxel) : on importe `from Engine import engine as e` et on appelle `e.init()`, `e.cls()`, `e.btn()`, etc.
+
+Sous le capot :
+
+- **`App`** — classe principale qui gère la fenêtre Pygame, l'horloge FPS, le `virtual_screen` (Surface logique), et la boucle d'événements.
+- **`Graphics`** — dessin sur l'écran virtuel avec support de caméra, clipping, et alpha.
+- **`Input`** — gestion clavier, souris, joystick.
+- **`Resources`** — chargement d'images, sons, musiques.
+- **`Audio`** — lecture son/musique via les canaux Pygame.
+
+---
+
+## Initialisation
+
+### `e.init(width, height, title="Pyxel Compat", fps=30, display_scale=1)`
+
+Crée la fenêtre et initialise tous les sous-systèmes.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `width` | `int` | Largeur logique de l'écran virtuel (ex: 200) |
+| `height` | `int` | Hauteur logique (ex: 200) |
+| `title` | `str` | Titre de la fenêtre |
+| `fps` | `int` | Images par seconde cibles |
+| `display_scale` | `int` | Facteur d'échelle entier (ex: 5 → fenêtre 1000×1000 pour 200×200) |
+
+L'écran virtuel fait `width × height` pixels. Chaque frame, il est scaled par `display_scale` et affiché dans la fenêtre système.
 
 ```python
-from Engine import engine as e
+e.init(200, 200, "Mon Jeu", 60, 5)
+```
 
-e.init(200, 200, title="Mon Jeu", fps=60, display_scale=4)
+### `e.run(update, draw)`
 
+Lance la boucle de jeu. `update()` est appelée à chaque frame pour la logique, `draw()` pour le rendu.
+
+```python
 def update():
-    if e.btn(e.KEY_ESCAPE):
-        e.quit()
+    pass
 
 def draw():
-    e.cls((30, 30, 40))
-    e.rect(10, 10, 20, 20, (255, 0, 0))
+    e.cls((0, 0, 0))
 
 e.run(update, draw)
 ```
 
-## Initialisation
+### `e.quit()`
+
+Ferme Pygame et termine le processus.
+
+### `e.width()`, `e.height()`
+
+Retourne la largeur/hauteur logique définies dans `init()`.
+
+### `e.frame_count()`
+
+Retourne le nombre de frames écoulées depuis `init()`.
+
+---
+
+## Graphismes — `Graphics`
+
+Toutes les fonctions de dessin **sont affectées par la caméra** (sauf si `camera()` est réinitialisée).  
+Les coordonnées sont en pixels logiques.
+
+### Primitives de dessin
 
 | Fonction | Description |
-|---|---|
-| `init(width, height, title, fps, display_scale)` | Crée la fenêtre et le moteur |
-| `run(update, draw)` | Lance la boucle de jeu |
-| `quit()` | Quitte l'application |
+|----------|-------------|
+| `cls(color)` | Remplit tout l'écran virtuel avec une couleur |
+| `pset(x, y, color)` | Dessine un pixel |
+| `pget(x, y) → Color` | Lit la couleur d'un pixel |
+| `line(x1, y1, x2, y2, color)` | Ligne |
+| `rect(x, y, w, h, color)` | Rectangle plein |
+| `rectb(x, y, w, h, color)` | Rectangle vide (1px de bord) |
+| `circ(x, y, r, color)` | Cercle plein |
+| `circb(x, y, r, color)` | Cercle vide (1px de bord) |
+| `elli(x, y, w, h, color)` | Ellipse pleine |
+| `ellib(x, y, w, h, color)` | Ellipse vide (1px de bord) |
+| `tri(x1, y1, x2, y2, x3, y3, color)` | Triangle plein |
+| `trib(x1, y1, x2, y2, x3, y3, color)` | Triangle vide (1px de bord) |
 
-- `display_scale` : multiplicateur entier (ex: 4 → fenêtre 800×800 pour virtuel 200×200)
-- La `virtual_screen` fait `width × height` pixels logiques, scaled au display
+### Couleurs avec alpha (RGBA)
 
-## Entrées clavier
-
-```python
-btn(key)    → maintenu ?
-btnp(key)   → vient d'être pressé ?
-btnr(key)   → vient d'être relâché ?
-```
-
-Constantes : `KEY_A`–`KEY_Z`, `KEY_0`–`KEY_9`, `KEY_SPACE`, `KEY_UP`, `KEY_DOWN`,
-`KEY_LEFT`, `KEY_RIGHT`, `KEY_ESCAPE`, `KEY_RETURN`, `KEY_LSHIFT`, `KEY_RSHIFT`,
-`KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_TAB`, `KEY_BACKSPACE`
-
-## Entrées souris
+Toutes les primitives sauf `text()` et `pget()` acceptent des couleurs **RGBA** (4 valeurs).  
+L'alpha est géré via un blending additif sur une surface temporaire.
 
 ```python
-mouse_x(), mouse_y()            → position en coordonnées logiques
-mouse_btn(btn)                  → maintenu ?
-mouse_btnp(btn)                 → vient d'être pressé ?
-mouse_btnr(btn)                 → vient d'être relâché ?
+# Rectangle semi-transparent
+e.rect(10, 10, 50, 50, (255, 0, 0, 128))
 ```
-
-Boutons : `MOUSE_BUTTON_LEFT` (1), `MOUSE_BUTTON_MIDDLE` (2), `MOUSE_BUTTON_RIGHT` (3)
-
-## Dessin (coordonnées monde, affectées par la caméra)
-
-```python
-cls(color)                        → remplir l'écran
-pset(x, y, color)                 → pixel
-pget(x, y)                        → lire un pixel
-line(x1, y1, x2, y2, color)       → ligne
-rect(x, y, w, h, color)           → rectangle plein
-rectb(x, y, w, h, color)          → rectangle vide (1px)
-circ(x, y, r, color)              → cercle plein
-circb(x, y, r, color)             → cercle vide (1px)
-elli(x, y, w, h, color)           → ellipse pleine
-ellib(x, y, w, h, color)          → ellipse vide (1px)
-tri(x1,y1, x2,y2, x3,y3, color)   → triangle plein
-trib(...)                         → triangle vide (1px)
-text(x, y, "texte", color)        → texte (police par défaut 16px)
-```
-
-### Alpha (RGBA)
-
-Toutes les primitives ci-dessus (sauf `text`) acceptent des couleurs RGBA :
-`rect(10, 10, 20, 20, (255, 0, 0, 128))` → blending additif
 
 ### Blit d'image
 
@@ -84,95 +139,362 @@ Toutes les primitives ci-dessus (sauf `text`) acceptent des couleurs RGBA :
 blt(x, y, img, u, v, w, h, colkey=None, rotate=0)
 ```
 
-- `img` : surface Pygame (ex: chargée via `resources.image()`)
-- `u, v, w, h` : région source dans l'image
-- `colkey` : couleur de transparence
-- `rotate` : rotation en degrés (sens horaire, pivot au centre)
-
-## Caméra
-
-```python
-camera(dx, dy)      → applique un décalage à tout le dessin
-camera()            → réinitialise à (0, 0)
-```
-
-### Camera intelligente (suivi de cible)
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `x, y` | `int` | Position de destination (coin supérieur gauche) |
+| `img` | `pygame.Surface` | Image source |
+| `u, v` | `int` | Coordonnées source (coin supérieur gauche dans l'image) |
+| `w, h` | `int` | Dimensions de la région source |
+| `colkey` | `Color` ou `None` | Couleur de transparence (optionnelle) |
+| `rotate` | `float` | Rotation en degrés horaire (pivot au centre) |
 
 ```python
-cam = e.Camera(target, largeur, hauteur, mouse_influence=0.2, mouse_limit=10)
-cam.shake(duration, intensity)    → tremblement
-cam.flash(color, alpha, duration) → flash écran
-cam.update()                      → calcule le décalage
-cam.apply()                       → applique au moteur graphique
+e.blt(100, 100, img, 0, 0, 16, 16)          # blit simple
+e.blt(100, 100, img, 0, 0, 16, 16, rotate=45)  # rotation
 ```
 
-- La caméra suit `target` (objet avec `.x`, `.y`)
-- `mouse_influence` : la souris attire le regard (0.0–1.0)
-- `mouse_limit` : décalage max du regard (pixels)
-- `_global_mouse_pos` : position souris en coordonnées monde (après `update()`)
-
-## Ressources
+### Texte
 
 ```python
-resources.image(bank, path, colkey=None)  → charge une image dans bank[index]
-resources.sound(bank, path)               → charge un son
-resources.music(bank, path)               → enregistre un chemin musique
+text(x, y, s, color, font=None)
 ```
 
-- Les images sont stockées dans `resources.images[bank]`
-- Les sons dans `resources.sounds[bank]`
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `x, y` | `int` | Position |
+| `s` | `str` | Texte à afficher |
+| `color` | `tuple` | Couleur RGB (pas de support alpha) |
+| `font` | `pygame.Font` ou `None` | Police personnalisée (None = police pixel par défaut) |
 
-## Audio
+La police par défaut est **PressStart2P.ttf** taille 6px, rendu **sans anti-aliasing** pour un aspect pixel art.
 
 ```python
-audio.play(channel, sound_key, loop=False)   → joue un son
-audio.playm(music_key, loop=False)           → joue une musique
-audio.stop(channel=None)                     → stop (tout si None)
-audio.play_pos(channel)                      → canal actif ?
+e.text(5, 5, "Score: 42", (255, 255, 255))
+
+# Avec une police différente
+big = e.default_font(16)
+e.text(5, 20, "Titre", (255, 200, 0), font=big)
 ```
 
-- 8 canaux (0–7) pour les effets sonores
-- 1 flux musique via `pygame.mixer.music`
-
-## Clipping
+### Caméra
 
 ```python
-clip(x, y, w, h)    → active le rectangle de clipping
-clip()              → désactive
+camera(dx, dy)    # Applique un décalage à tout le dessin suivant
+camera()          # Réinitialise le décalage à (0, 0)
 ```
+
+La caméra est cumulative : tous les appels `camera()` s'ajoutent.  
+Pour un système plus avancé, voir la [classe `Camera`](#caméra-intelligente--camera).
+
+```python
+e.camera(-player.x + 100, -player.y + 100)   # suit le joueur
+```
+
+### Clipping
+
+```python
+clip(x, y, w, h)    # Active un rectangle de clipping
+clip()              # Désactive le clipping
+```
+
+Le clipping est appliqué après la caméra.
+
+---
+
+## Caméra intelligente — `Camera`
+
+```python
+cam = e.Camera(target, screen_width, screen_height,
+               mouse_influence=0.2, mouse_limit=10)
+```
+
+Classe réutilisable avec suivi de cible, offset souris, tremblement et flash.
+
+### Paramètres du constructeur
+
+| Paramètre | Défaut | Description |
+|-----------|--------|-------------|
+| `target` | — | Objet suivi (doit avoir `.x`, `.y`) |
+| `screen_width` | — | Largeur de l'écran logique |
+| `screen_height` | — | Hauteur de l'écran logique |
+| `mouse_influence` | `0.2` | Sensibilité du regard vers la souris (0.0–1.0) |
+| `mouse_limit` | `10` | Décalage maximal dû à la souris (en pixels logiques) |
+
+### Méthodes
+
+| Méthode | Description |
+|---------|-------------|
+| `update()` | Calcule la nouvelle position de la caméra (target + souris + shake) |
+| `apply()` | Applique le décalage au moteur graphique (`e.camera(cam.cam_x, cam.cam_y)`) |
+| `shake(duration, intensity)` | Déclenche un tremblement d'écran |
+| `flash(color, alpha, duration)` | Déclenche un flash d'écran |
+
+### Attributs
+
+| Attribut | Description |
+|----------|-------------|
+| `cam_x, cam_y` | Position calculée de la caméra (en pixels logiques) |
+| `flash_color` | Couleur du flash actif |
+| `flash_alpha` | Opacité courante du flash |
+| `shake_intensity` | Intensité du tremblement actuel |
+
+Le flash doit être dessiné manuellement dans `draw()` :
+
+```python
+if cam.flash_alpha > 0:
+    surf = pygame.Surface((e.width(), e.height()), pygame.SRCALPHA)
+    surf.fill((*cam.flash_color, cam.flash_alpha))
+    e.graphics.screen.blit(surf, (0, 0))
+```
+
+---
+
+## Entrées — `Input`
+
+### Clavier
+
+```python
+btn(key)        # → True si la touche est maintenue
+btnp(key)       # → True le frame où la touche est pressée (pas de répétition)
+btnr(key)       # → True le frame où la touche est relâchée
+```
+
+```python
+if e.btn(e.KEY_SPACE):
+    player.jump()
+if e.btnp(e.KEY_E):
+    player.interact()
+```
+
+### Souris
+
+```python
+mouse_x(), mouse_y()     # → Position logique (divisée par display_scale)
+mouse_btn(button)        # → True si le bouton est maintenu
+mouse_btnp(button)       # → True le frame du clic
+mouse_btnr(button)       # → True le frame du relâchement
+mouse(visible=True)      # → Affiche ou cache le curseur système
+```
+
+Boutons : `MOUSE_BUTTON_LEFT` (1), `MOUSE_BUTTON_MIDDLE` (2), `MOUSE_BUTTON_RIGHT` (3)
+
+```python
+if e.mouse_btnp(e.MOUSE_BUTTON_LEFT):
+    print(f"Clic à ({e.mouse_x()}, {e.mouse_y()})")
+```
+
+### Joystick
+
+```python
+joy(joy_id, button)       # → True si le bouton du joystick est pressé
+joy_axis(joy_id, axis)    # → Valeur de l'axe (-1.0 à 1.0)
+```
+
+Les joysticks sont détectés et initialisés automatiquement au lancement.
+
+---
+
+## Ressources — `Resources`
+
+```python
+resources.image(bank, path, colkey=None)   # → pygame.Surface ou None
+resources.sound(bank, path)                # → pygame.mixer.Sound ou None
+resources.music(bank, path)                # → None (enregistre le chemin)
+resources.tilemap(bank)                    # → None (non implémenté)
+resources.load(filename)                   # → lève NotImplementedError
+```
+
+### Images
+
+`image()` charge une image dans `resources.images[bank]`.
+
+- `bank` : index numérique (`int`)
+- `path` : chemin relatif ou absolu
+- `colkey` : couleur de transparence optionnelle (ex: `(255, 0, 255)`)
+
+```python
+e.resources.image(0, "./sprites/player.png")
+e.resources.image(1, "./sprites/tiles.png", (255, 0, 255))
+
+# Utilisation
+img = e.resources.images[1]
+```
+
+### Sons
+
+```python
+e.resources.sound(0, "./sfx/jump.wav")
+e.audio.play(0, 0)         # joue sur le canal 0
+```
+
+---
+
+## Audio — `Audio`
+
+8 canaux (0–7) pour les effets sonores, 1 flux pour la musique.
+
+```python
+audio.play(channel, sound_key, loop=False)       # joue un son
+audio.playm(music_key, loop=False)               # joue une musique
+audio.stop(channel=None)                         # stop (tout si channel=None)
+audio.play_pos(channel)                          # → True si le canal est actif
+```
+
+```python
+e.audio.play(2, 0)                 # son index 0 sur canal 2
+e.audio.playm("boss_music")        # musique
+e.audio.stop()                     # coupe tout
+```
+
+---
+
+## Police pixel — `default_font`
+
+```python
+default_font(size=6) → pygame.Font
+```
+
+Charge et met en cache la police **PressStart2P.ttf**.  
+Si le fichier TTF est introuvable, tombe sur `pygame.font.Font(None, size)`.
+
+La police est stockée dans un cache global `_pixel_font_cache` : chaque taille n'est chargée qu'une fois.
+
+```python
+petite = e.default_font(6)
+moyenne = e.default_font(8)
+grande  = e.default_font(16)
+```
+
+---
+
+## Constantes
+
+### Touches clavier
+
+`KEY_A`–`KEY_Z`, `KEY_0`–`KEY_9`,
+`KEY_SPACE`, `KEY_UP`, `KEY_DOWN`, `KEY_LEFT`, `KEY_RIGHT`,
+`KEY_ESCAPE`, `KEY_RETURN`, `KEY_TAB`, `KEY_BACKSPACE`,
+`KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`,
+`KEY_LALT`, `KEY_RALT`
+
+Toutes sont des constantes Pygame (`pygame.K_*`) réexportées par le module.
+
+### Boutons souris
+
+| Constante | Valeur |
+|-----------|--------|
+| `MOUSE_BUTTON_LEFT` | `1` |
+| `MOUSE_BUTTON_MIDDLE` | `2` |
+| `MOUSE_BUTTON_RIGHT` | `3` |
+
+---
+
+## Fonctions globales
+
+Le module `engine` expose des fonctions globales qui délèguent aux sous-systèmes internes :
+
+| Fonction | Délègue à |
+|----------|-----------|
+| `cls(c)` | `graphics.cls(c)` |
+| `pset(x,y,c)` | `graphics.pset(x,y,c)` |
+| `pget(x,y)` | `graphics.pget(x,y)` |
+| `line(x1,y1,x2,y2,c)` | `graphics.line(...)` |
+| `rect(x,y,w,h,c)` | `graphics.rect(...)` |
+| `rectb(x,y,w,h,c)` | `graphics.rectb(...)` |
+| `circ(x,y,r,c)` | `graphics.circ(...)` |
+| `circb(x,y,r,c)` | `graphics.circb(...)` |
+| `elli(x,y,w,h,c)` | `graphics.elli(...)` |
+| `ellib(x,y,w,h,c)` | `graphics.ellib(...)` |
+| `tri(x1,y1,x2,y2,x3,y3,c)` | `graphics.tri(...)` |
+| `trib(x1,y1,x2,y2,x3,y3,c)` | `graphics.trib(...)` |
+| `text(x,y,s,c,font)` | `graphics.text(...)` |
+| `blt(x,y,img,u,v,w,h,...)` | `graphics.blt(...)` |
+| `bltm(x,y,tm,u,v,w,h,...)` | `graphics.bltm(...)` |
+| `clip(x,y,w,h)` | `graphics.clip(...)` |
+| `camera(x,y)` | `graphics.camera(...)` |
+| `pal(c1,c2)` | `graphics.pal(...)` (stub) |
+| `dither(a)` | `graphics.dither(...)` (stub) |
+| `mouse_btn(b)` | `input.mouse_btn(b)` |
+| `mouse_btnp(b)` | `input.mouse_btnp(b)` |
+| `mouse_btnr(b)` | `input.mouse_btnr(b)` |
+| `btn(k)` | `input.btn(k)` |
+| `btnp(k)` | `input.btnp(k)` |
+| `btnr(k)` | `input.btnr(k)` |
+
+---
 
 ## Exemple complet
 
 ```python
+import pygame
 from Engine import engine as e
 from random import randint
 
-e.init(200, 200, "Demo", 60, 4)
-img = e.resources.image(0, "sprites.png")
+# ── Initialisation ─────────────────────────────────────
+e.init(200, 200, "Aventurier", fps=60, display_scale=5)
 
+# ── Ressources ─────────────────────────────────────────
+e.resources.image(0, "./sprites/player.png")
+e.resources.image(1, "./sprites/tiles.png")
+
+# ── Joueur ─────────────────────────────────────────────
 class Player:
     def __init__(self):
         self.x = 100
         self.y = 100
+        self.w = 8
+        self.h = 8
+        self.vie = 100
 
 player = Player()
-cam = e.Camera(player, e.width(), e.height())
 
+# ── Caméra ─────────────────────────────────────────────
+cam = e.Camera(player, e.width(), e.height(),
+               mouse_influence=0.3, mouse_limit=12)
+
+# ── Boucle ─────────────────────────────────────────────
 def update():
-    if e.btn(e.KEY_LEFT): player.x -= 1
+    # Déplacements
+    if e.btn(e.KEY_LEFT):  player.x -= 1
     if e.btn(e.KEY_RIGHT): player.x += 1
-    if e.btn(e.KEY_UP): player.y -= 1
-    if e.btn(e.KEY_DOWN): player.y += 1
+    if e.btn(e.KEY_UP):    player.y -= 1
+    if e.btn(e.KEY_DOWN):  player.y += 1
     if e.btn(e.KEY_ESCAPE): e.quit()
+
+    # Clic pour shake
+    if e.mouse_btnp(e.MOUSE_BUTTON_LEFT):
+        cam.shake(10, 6)
+        cam.flash((255, 255, 200), 60, 4)
+
     cam.update()
     cam.apply()
 
 def draw():
-    e.cls((20, 20, 30))
-    e.rect(player.x - 4, player.y - 4, 8, 8, (100, 200, 255))
-    e.camera()
-    e.text(2, 2, f"FPS: {e.frame_count()}", (255, 255, 255))
-    e.circb(e.mouse_x(), e.mouse_y(), 4, (255, 255, 255, 50))
+    e.cls((30, 30, 40))
+
+    # Sol (en coordonnées monde)
+    for i in range(-2, 30):
+        for j in range(-2, 20):
+            e.rect(i * 8, j * 8, 8, 8, (40, 45, 55))
+
+    # Joueur
+    e.rect(player.x, player.y, player.w, player.h,
+           (100, 200, 255) if player.vie > 0 else (255, 50, 50))
+
+    # Flash overlay (dessiné avant la réinitialisation caméra)
+    if cam.flash_alpha > 0:
+        surf = pygame.Surface((e.width(), e.height()), pygame.SRCALPHA)
+        surf.fill((*cam.flash_color, cam.flash_alpha))
+        e.graphics.screen.blit(surf, (0, 0))
+
+    # ── HUD (coordonnées écran) ──
+    e.camera()  # ← réinitialise la caméra
+
+    e.text(4, 4, f"Vie: {player.vie}", (255, 255, 255))
+    e.text(4, 12, f"Pos: {player.x},{player.y}", (200, 200, 200))
+
+    # Curseur
+    e.circb(e.mouse_x(), e.mouse_y(), 3, (255, 255, 255, 80))
 
 e.run(update, draw)
 ```
