@@ -15,11 +15,11 @@ MAP_BIOMES = [ "desert"]  # used when MAP_MODE is island/surface/multi (or list 
 e.init(200, 200, title="Game", fps=60, display_scale=5)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
-img = e.resources.images[0]
-img2 = e.resources.images[1]
+sheet1 = e.resources.images[0]
+stuff = e.resources.images[1]
 world = World()
 
-player = Player(10, 10, 8, 8, img, world=world)
+player = Player(10, 10, 8, 8, sheet1, world=world)
 player.speed = 1
 world.add(player)
 
@@ -29,7 +29,7 @@ frames_dict = {
     "idle_left": (0, 5), "idle_right": (0, 4),
     "walk_up": (0, 2), "walk_down": (0, 3),
     "walk_left": (0, 1), "walk_right": (0, 0),
-    "bank":img2,
+    "bank":stuff,
 }
 frames_dict2 = {
     "image_x":8, "image_y":0, "shadow": (-8, 0),
@@ -37,7 +37,7 @@ frames_dict2 = {
     "idle_left": (0, 5), "idle_right": (0, 4),
     "walk_up": (0, 2), "walk_down": (0, 3),
     "walk_left": (0, 1), "walk_right": (0, 0),
-    "bank":img2,
+    "bank":stuff,
 }
 
 game_map = Map(world)
@@ -50,23 +50,24 @@ if MAP_MODE == "single":
             {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 90, "punch_damage": 8, "punch_cooldown": 50},
         ],
         item_configs=[
-            {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
-            {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Sword, "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
+            {"cls": Crossbow, "bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )
 elif MAP_MODE == "island":
     game_map.generate_island(
         MAP_BIOMES, 20, 20,
-        npc_count=8, player=player,
+        npc_count=4, player=player,
         npc_configs=[
             {"frames_dict": frames_dict, "max_health": 80, "speed": 0.6, "punch_damage": 4, "punch_cooldown": 40},
             {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 20, "punch_damage": 8, "punch_cooldown": 50},
         ],
         item_configs=[
-            {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
-            {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
-            {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
+            {"cls": Sword,"name":"excalibour", "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
+            {"cls": Crossbow,"name":"crossbrow", "bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Consumable,"name":"wisky", "bank": stuff, "heal_amount": 15, "dropped_pos": (1, 0), "count": 3},
+            {"cls": Consumable,"name":"pomme", "bank": stuff, "heal_amount": 15, "dropped_pos": (2, 0), "count": 2}
         ],
     )
 elif MAP_MODE == "surface":
@@ -78,8 +79,8 @@ elif MAP_MODE == "surface":
             {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 90, "punch_damage": 8, "punch_cooldown": 50},
         ],
         item_configs=[
-            {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
-            {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Sword, "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
+            {"cls": Crossbow, "bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )
@@ -92,8 +93,8 @@ elif MAP_MODE == "multi":
             {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 30, "punch_damage": 8, "punch_cooldown": 50},
         ],
         item_configs=[
-            {"cls": Sword, "bank": img2, "damage": 30, "dropped_pos": (3, 9), "count": 2},
-            {"cls": Crossbow, "bank": img2, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Sword, "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
+            {"cls": Crossbow, "bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )

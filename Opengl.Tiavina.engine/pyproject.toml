@@ -3,16 +3,18 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Tiavina.engine"
-version = "0.3.0"
-description = "Moteur de jeu 2D sur Pygame"
+name = "Opengl.Tiavina.engine"
+version = "0.1.0"
+description = "Moteur de jeu 2D sur PyOpenGL (GLFW + Pillow)"
 readme = "README.md"
 license = "GPL-3.0-only"
 requires-python = ">=3.9"
 dependencies = [
-    "pygame>=2.0.0",
+    "PyOpenGL>=3.1",
+    "glfw>=2.5",
+    "Pillow>=9.0",
 ]
-keywords = ["game", "engine", "pygame", "2d", "pixel"]
+keywords = ["game", "engine", "opengl", "2d", "pixel"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -24,12 +26,10 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Games/Entertainment",
-    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [project.urls]
 Homepage = "https://github.com/andyravelo4-code/"
-Source = "https://github.com/andyravelo4-code/T.Engine"
 
 [tool.setuptools.packages.find]
 include = ["Engine*"]

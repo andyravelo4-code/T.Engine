@@ -12,9 +12,9 @@ class Crossbow(Item):
 
     def __init__(self, x, y, w, h, bank, parent=None, world=None, damage=10,
                  shadow_pos=(0, 0), dropped_pos=(0, 9), held_idle_pos=(0, 9), held_fire_pos=(1, 9),
-                 fire_timer=15, cooldown=30):
+                 fire_timer=15, cooldown=30,name=""):
         super().__init__(x, y, w, h, bank, parent,
-                         name="Arbalète", stackable=False, max_stack=1)
+                         name=name, stackable=False, max_stack=1)
         self.world = world
         self.damage = damage
         self.shadow_pos = shadow_pos

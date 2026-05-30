@@ -669,7 +669,7 @@ class Map:
                 cls = cfg["cls"]
                 bank = cfg["bank"]
                 count = cfg.get("count", 1)
-                item_kwargs = {k: v for k, v in cfg.items() if k not in ("cls", "bank", "count")}
+                item_kwargs = {k: v for k, v in cfg.items() if k not in ("cls", "bank", "count","name")}
                 for _ in range(count):
                     for _ in range(500):
                         x = random.randint(2, self.width - 3)
@@ -678,7 +678,7 @@ class Map:
                             item = cls(
                                 x * self.tile_size, y * self.tile_size,
                                 self.tile_size, self.tile_size,
-                                bank, **item_kwargs,
+                                bank,name=cfg["name"], **item_kwargs
                             )
                             if hasattr(item, "world"):
                                 item.world = self.world

@@ -1,0 +1,1012 @@
+"""
+engine.py – Moteur de jeu 2D avec rendu PyOpenGL (GLFW + Pillow)
+API compatible avec le moteur Pygame original.
+"""
+
+import importlib.resources as _resources
+import math
+import pathlib
+import random
+import sys
+from array import array
+
+import glfw
+from OpenGL.GL import *
+from PIL import Image, ImageDraw, ImageFont
+
+# ----------------------------------------------------------------------
+# Constantes de touches (GLFW)
+# ----------------------------------------------------------------------
+KEY_A = glfw.KEY_A
+KEY_B = glfw.KEY_B
+KEY_C = glfw.KEY_C
+KEY_D = glfw.KEY_D
+KEY_E = glfw.KEY_E
+KEY_F = glfw.KEY_F
+KEY_G = glfw.KEY_G
+KEY_H = glfw.KEY_H
+KEY_I = glfw.KEY_I
+KEY_J = glfw.KEY_J
+KEY_K = glfw.KEY_K
+KEY_L = glfw.KEY_L
+KEY_M = glfw.KEY_M
+KEY_N = glfw.KEY_N
+KEY_O = glfw.KEY_O
+KEY_P = glfw.KEY_P
+KEY_Q = glfw.KEY_Q
+KEY_R = glfw.KEY_R
+KEY_S = glfw.KEY_S
+KEY_T = glfw.KEY_T
+KEY_U = glfw.KEY_U
+KEY_V = glfw.KEY_V
+KEY_W = glfw.KEY_W
+KEY_X = glfw.KEY_X
+KEY_Y = glfw.KEY_Y
+KEY_Z = glfw.KEY_Z
+KEY_0 = glfw.KEY_0
+KEY_1 = glfw.KEY_1
+KEY_2 = glfw.KEY_2
+KEY_3 = glfw.KEY_3
+KEY_4 = glfw.KEY_4
+KEY_5 = glfw.KEY_5
+KEY_6 = glfw.KEY_6
+KEY_7 = glfw.KEY_7
+KEY_8 = glfw.KEY_8
+KEY_9 = glfw.KEY_9
+KEY_SPACE = glfw.KEY_SPACE
+KEY_UP = glfw.KEY_UP
+KEY_DOWN = glfw.KEY_DOWN
+KEY_LEFT = glfw.KEY_LEFT
+KEY_RIGHT = glfw.KEY_RIGHT
+KEY_ESCAPE = glfw.KEY_ESCAPE
+KEY_ENTER = glfw.KEY_ENTER
+KEY_RETURN = glfw.KEY_ENTER
+KEY_LSHIFT = glfw.KEY_LEFT_SHIFT
+KEY_RSHIFT = glfw.KEY_RIGHT_SHIFT
+KEY_LCTRL = glfw.KEY_LEFT_CONTROL
+KEY_RCTRL = glfw.KEY_RIGHT_CONTROL
+KEY_LALT = glfw.KEY_LEFT_ALT
+KEY_RALT = glfw.KEY_RIGHT_ALT
+KEY_TAB = glfw.KEY_TAB
+KEY_BACKSPACE = glfw.KEY_BACKSPACE
+
+MOUSE_BUTTON_LEFT = 1
+MOUSE_BUTTON_MIDDLE = 2
+MOUSE_BUTTON_RIGHT = 3
+
+# ----------------------------------------------------------------------
+# Couleur
+# ----------------------------------------------------------------------
+def _norm_color(color):
+    n = tuple(c / 255.0 for c in color[:3])
+    if len(color) == 4:
+        return n + (color[3] / 255.0,)
+    return n + (1.0,)
+
+def _has_alpha(color):
+    return len(color) == 4
+
+# ----------------------------------------------------------------------
+# Police
+# ----------------------------------------------------------------------
+_pixel_font_cache = {}
+
+def _font_path():
+    try:
+        return str(_resources.files('Engine') / 'fonts' / 'PressStart2P.ttf')
+    except Exception:
+        return str(pathlib.Path("assests/fonts/PressStart2P.ttf"))
+
+# ----------------------------------------------------------------------
+# Image compatible (PIL + cache texture OpenGL)
+# ----------------------------------------------------------------------
+class _Img:
+    __slots__ = ('_pil', '_tex_id', '_tex_up')
+    def __init__(self, pil):
+        self._pil = pil
+        self._tex_id = 0
+        self._tex_up = False
+
+    def get_width(self):
+        return self._pil.width
+
+    def get_height(self):
+        return self._pil.height
+
+    def get_size(self):
+        return self._pil.size
+
+    def _ensure_tex(self):
+        if not self._tex_up:
+            self._tex_id = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, self._tex_id)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            data = self._pil.tobytes()
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self._pil.width, self._pil.height,
+                         0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+            self._tex_up = True
+
+    def subsurface(self, u, v, w, h):
+        c = self._pil.crop((u, v, u + w, v + h))
+        return _Img(c)
+
+
+# Équivalent Font.render -> _Img
+class _FontWrap:
+    def __init__(self, pil_font, size):
+        self._font = pil_font
+        self._size = size
+
+    @property
+    def font(self):
+        return self._font
+
+    def render(self, s, antialias, color):
+        dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(dummy)
+        bb = dr.textbbox((0, 0), s, font=self._font)
+        tw = bb[2] - bb[0]
+        th = bb[3] - bb[1]
+        if tw < 1:
+            tw = 1
+        if th < 1:
+            th = 1
+        img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(img)
+        dr.text((0, 0), s, font=self._font, fill=color)
+        return _Img(img)
+
+
+def default_font(size=6):
+    if size not in _pixel_font_cache:
+        try:
+            pil_font = ImageFont.truetype(_font_path(), size)
+        except Exception:
+            pil_font = ImageFont.load_default()
+        _pixel_font_cache[size] = _FontWrap(pil_font, size)
+    return _pixel_font_cache[size]
+
+
+# ----------------------------------------------------------------------
+# ScreenWrapper – émule e.graphics.screen.blit() / fill() / set_at() / get_at()
+# ----------------------------------------------------------------------
+class _Screen:
+    def __init__(self, width, height):
+        self._w = width
+        self._h = height
+
+    def get_width(self):
+        return self._w
+
+    def get_height(self):
+        return self._h
+
+    def get_size(self):
+        return (self._w, self._h)
+
+    def blit(self, source, dest, area=None, special_flags=0):
+        if isinstance(dest, (list, tuple)):
+            dx, dy = int(dest[0]), int(dest[1])
+        else:
+            dx, dy = int(dest.x), int(dest.y)
+
+        if isinstance(source, _Img):
+            pil_img = source._pil
+        elif isinstance(source, Image.Image):
+            pil_img = source
+        else:
+            w, h = source.get_size()
+            data = None
+            if hasattr(source, 'tobytes'):
+                data = source.tobytes()
+            elif hasattr(source, 'get_buffer'):
+                data = bytes(source.get_buffer())
+            if data is None:
+                return
+            try:
+                pil_img = Image.frombuffer('RGBA', (w, h), data, 'raw', 'RGBA', 0, 1)
+            except Exception:
+                return
+
+        if area:
+            u, v, w, h = area
+            pil_img = pil_img.crop((u, v, u + w, v + h))
+        w, h = pil_img.size
+
+        tex = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     pil_img.tobytes())
+
+        glEnable(GL_TEXTURE_2D)
+        glBegin(GL_QUADS)
+        glTexCoord2f(0, 0); glVertex2i(dx, dy)
+        glTexCoord2f(1, 0); glVertex2i(dx + w, dy)
+        glTexCoord2f(1, 1); glVertex2i(dx + w, dy + h)
+        glTexCoord2f(0, 1); glVertex2i(dx, dy + h)
+        glEnd()
+        glDeleteTextures(1, [tex])
+
+    def fill(self, color):
+        c = _norm_color(color)
+        glClearColor(c[0], c[1], c[2], 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+    def set_at(self, pos, color):
+        glDisable(GL_TEXTURE_2D)
+        c = _norm_color(color)
+        glColor4f(*c)
+        glPointSize(1.0)
+        glBegin(GL_POINTS)
+        glVertex2i(int(pos[0]), int(pos[1]))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+
+    def get_at(self, pos):
+        data = glReadPixels(int(pos[0]), self._h - int(pos[1]) - 1, 1, 1,
+                            GL_RGBA, GL_UNSIGNED_BYTE)
+        return (data[0], data[1], data[2], data[3])
+
+
+# ----------------------------------------------------------------------
+# Entrées
+# ----------------------------------------------------------------------
+class Input:
+    def __init__(self, window):
+        self._window = window
+        self._keys_pressed = {}
+        self._keys_just_pressed = {}
+        self._keys_just_released = {}
+        self._mouse_pressed = {}
+        self._mouse_just_pressed = {}
+        self._mouse_just_released = {}
+        self._mouse_x = 0
+        self._mouse_y = 0
+        self._joysticks = []
+
+        glfw.set_key_callback(window, self._key_cb)
+        glfw.set_mouse_button_callback(window, self._mouse_cb)
+        glfw.set_cursor_pos_callback(window, self._cursor_cb)
+
+    def _key_cb(self, window, key, scancode, action, mods):
+        if key < 0:
+            return
+        if action == glfw.PRESS or action == glfw.REPEAT:
+            self._keys_just_pressed[key] = True
+            self._keys_pressed[key] = True
+        elif action == glfw.RELEASE:
+            self._keys_just_released[key] = True
+            self._keys_pressed[key] = False
+
+    def _mouse_cb(self, window, button, action, mods):
+        b = button + 1
+        if action == glfw.PRESS:
+            self._mouse_just_pressed[b] = True
+            self._mouse_pressed[b] = True
+        elif action == glfw.RELEASE:
+            self._mouse_just_released[b] = True
+            self._mouse_pressed[b] = False
+
+    def _cursor_cb(self, window, x, y):
+        self._mouse_x = x
+        self._mouse_y = y
+
+    def update(self):
+        self._keys_just_pressed.clear()
+        self._keys_just_released.clear()
+        self._mouse_just_pressed.clear()
+        self._mouse_just_released.clear()
+
+    def btn(self, key):
+        return self._keys_pressed.get(key, False)
+
+    def btnp(self, key, hold=0, period=0):
+        return self._keys_just_pressed.get(key, False)
+
+    def btnr(self, key):
+        return self._keys_just_released.get(key, False)
+
+    def mouse(self, visible=True):
+        mode = glfw.CURSOR_NORMAL if visible else glfw.CURSOR_HIDDEN
+        glfw.set_input_mode(self._window, glfw.CURSOR, mode)
+
+    def mouse_btn(self, button):
+        return self._mouse_pressed.get(button, False)
+
+    def mouse_btnp(self, button):
+        return self._mouse_just_pressed.get(button, False)
+
+    def mouse_btnr(self, button):
+        return self._mouse_just_released.get(button, False)
+
+
+# ----------------------------------------------------------------------
+# Ressources
+# ----------------------------------------------------------------------
+class Resources:
+    def __init__(self):
+        self.images = []
+        self.sounds = {}
+        self.musics = {}
+        self.tilemaps = []
+
+    def load(self, filename):
+        raise NotImplementedError("Chargement .pyxres non implémenté")
+
+    def image(self, bank, img_path, colkey=None):
+        try:
+            pil = Image.open(img_path).convert('RGBA')
+            if colkey:
+                data = pil.load()
+                for y in range(pil.height):
+                    for x in range(pil.width):
+                        p = data[x, y]
+                        if p[:3] == colkey[:3]:
+                            data[x, y] = (0, 0, 0, 0)
+            while len(self.images) <= bank:
+                self.images.append(None)
+            self.images[bank] = _Img(pil)
+            return self.images[bank]
+        except Exception as e:
+            print(f"Erreur chargement image {img_path}: {e}")
+            return None
+
+    def sound(self, bank, sound_path):
+        print(f"Son non implémenté (OpenGL): {sound_path}")
+        self.sounds[bank] = None
+        return None
+
+    def music(self, bank, music_path):
+        self.musics[bank] = music_path
+
+    def tilemap(self, bank):
+        return None
+
+
+# ----------------------------------------------------------------------
+# Audio (stub – pas de dépendance audio)
+# ----------------------------------------------------------------------
+class Audio:
+    def __init__(self):
+        self.sounds = {}
+        self.musics = {}
+
+    def play(self, ch, s, loop=False):
+        pass
+
+    def playm(self, m, loop=False):
+        pass
+
+    def stop(self, ch=None):
+        pass
+
+    def play_pos(self, ch):
+        return False
+
+
+# ----------------------------------------------------------------------
+# Graphiques (OpenGL)
+# ----------------------------------------------------------------------
+class Graphics:
+    def __init__(self, width, height, display_scale):
+        self._w = width
+        self._h = height
+        self._scale = display_scale
+        self._camera_x = 0
+        self._camera_y = 0
+        self._clip_rect = None
+        self._default_font = None
+        self._font_wrap = None
+        self._tex_cache = {}       # id(_Img) -> bool (uploaded)
+        self._colkey_cache = {}    # (img_id, u, v, w, h, colkey) -> tex_id
+        self._circle_cache = {}    # radius -> (display list | vertices)
+
+        # Écran de compatibilité
+        self.screen = _Screen(width, height)
+
+        # Projection
+        glViewport(0, 0, width * display_scale, height * display_scale)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, width, height, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glReadBuffer(GL_BACK)
+        glEnable(GL_TEXTURE_2D)
+        glClearColor(0, 0, 0, 1)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+    # --- Aide texture ---
+    def _upload_tex(self, pil_img):
+        tex = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        data = pil_img.tobytes()
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pil_img.width, pil_img.height,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+        return tex
+
+    def _tex_of(self, img):
+        if isinstance(img, _Img):
+            img._ensure_tex()
+            return img._tex_id, img._pil.width, img._pil.height
+        if isinstance(img, Image.Image):
+            tid = self._tex_cache.get(id(img))
+            if tid is None:
+                tid = self._upload_tex(img)
+                self._tex_cache[id(img)] = tid
+            return tid, img.width, img.height
+        return 0, 0, 0
+
+    # --- Primitives ---
+    def _draw_quad(self, x, y, w, h, color):
+        x += self._camera_x
+        y += self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_QUADS)
+        glVertex2f(x, y)
+        glVertex2f(x + w, y)
+        glVertex2f(x + w, y + h)
+        glVertex2f(x, y + h)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def _draw_outline(self, x, y, w, h, color):
+        x += self._camera_x
+        y += self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_LINE_LOOP)
+        glVertex2f(x, y)
+        glVertex2f(x + w, y)
+        glVertex2f(x + w, y + h)
+        glVertex2f(x, y + h)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def cls(self, color):
+        c = _norm_color(color)
+        glClearColor(c[0], c[1], c[2], 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+    def pset(self, x, y, color):
+        x += self._camera_x
+        y += self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glPointSize(1.0)
+        glBegin(GL_POINTS)
+        glVertex2f(x, y)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def pget(self, x, y):
+        x += self._camera_x
+        y += self._camera_y
+        if 0 <= x < self._w and 0 <= y < self._h:
+            data = glReadPixels(int(x), int(self._h * self._scale - y - 1),
+                                1, 1, GL_RGBA, GL_UNSIGNED_BYTE)
+            return (data[0], data[1], data[2], data[3])
+        return (0, 0, 0, 0)
+
+    def line(self, x1, y1, x2, y2, color):
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_LINES)
+        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
+        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def rect(self, x, y, w, h, color):
+        self._draw_quad(x, y, w, h, color)
+
+    def rectb(self, x, y, w, h, color):
+        self._draw_outline(x, y, w, h, color)
+
+    def circ(self, x, y, r, color):
+        cx = x + self._camera_x
+        cy = y + self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int(r * 2))
+        glBegin(GL_TRIANGLE_FAN)
+        glVertex2f(cx, cy)
+        for i in range(segs + 1):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + r * math.cos(a),
+                       cy + r * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def circb(self, x, y, r, color):
+        cx = x + self._camera_x
+        cy = y + self._camera_y
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int(r * 2))
+        glBegin(GL_LINE_LOOP)
+        for i in range(segs):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + r * math.cos(a),
+                       cy + r * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def elli(self, x, y, w, h, color):
+        cx = x + self._camera_x + w / 2
+        cy = y + self._camera_y + h / 2
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int((w + h) / 2))
+        glBegin(GL_TRIANGLE_FAN)
+        glVertex2f(cx, cy)
+        for i in range(segs + 1):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + w / 2 * math.cos(a),
+                       cy + h / 2 * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def ellib(self, x, y, w, h, color):
+        cx = x + self._camera_x + w / 2
+        cy = y + self._camera_y + h / 2
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        segs = max(8, int((w + h) / 2))
+        glBegin(GL_LINE_LOOP)
+        for i in range(segs):
+            a = 2.0 * 3.14159265 * i / segs
+            glVertex2f(cx + w / 2 * math.cos(a),
+                       cy + h / 2 * math.sin(a))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def tri(self, x1, y1, x2, y2, x3, y3, color):
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_TRIANGLES)
+        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
+        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
+        glVertex2f(x3 + self._camera_x, y3 + self._camera_y)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    def trib(self, x1, y1, x2, y2, x3, y3, color):
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glColor4f(*c)
+        glBegin(GL_LINE_LOOP)
+        glVertex2f(x1 + self._camera_x, y1 + self._camera_y)
+        glVertex2f(x2 + self._camera_x, y2 + self._camera_y)
+        glVertex2f(x3 + self._camera_x, y3 + self._camera_y)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1, 1, 1, 1)
+
+    # --- Texte ---
+    def text(self, x, y, s, color, font=None):
+        if font is None:
+            if self._font_wrap is None:
+                self._font_wrap = default_font(6)
+            font = self._font_wrap
+        elif not isinstance(font, _FontWrap):
+            font = _FontWrap(font, 6)
+
+        dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(dummy)
+        bb = dr.textbbox((0, 0), s, font=font.font)
+        tw = max(1, bb[2] - bb[0])
+        th = max(1, bb[3] - bb[1])
+        img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(img)
+        dr.text((0, 0), s, font=font.font, fill=color)
+
+        tex = self._upload_tex(img)
+        dx = x + self._camera_x
+        dy = y + self._camera_y
+
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glBegin(GL_QUADS)
+        glTexCoord2f(0, 0); glVertex2f(dx, dy)
+        glTexCoord2f(1, 0); glVertex2f(dx + tw, dy)
+        glTexCoord2f(1, 1); glVertex2f(dx + tw, dy + th)
+        glTexCoord2f(0, 1); glVertex2f(dx, dy + th)
+        glEnd()
+        glDeleteTextures(1, [tex])
+
+    # --- Blit (sprite) ---
+    def blt(self, x, y, img, u, v, w, h, colkey=None, rotate=0):
+        dx = x + self._camera_x
+        dy = y + self._camera_y
+
+        if colkey is not None and isinstance(img, _Img):
+            key = (id(img), u, v, w, h, colkey)
+            tid = self._colkey_cache.get(key)
+            if tid is None:
+                sub = img._pil.crop((u, v, u + w, v + h))
+                data = sub.load()
+                for py in range(h):
+                    for px in range(w):
+                        p = data[px, py]
+                        if p[:3] == colkey[:3]:
+                            data[px, py] = (0, 0, 0, 0)
+                tid = self._upload_tex(sub)
+                self._colkey_cache[key] = tid
+            tex_id, iw, ih = tid, w, h
+        else:
+            tex_id, iw, ih = self._tex_of(img)
+
+        tu1 = u / iw if iw > 0 else 0
+        tv1 = v / ih if ih > 0 else 0
+        tu2 = (u + w) / iw if iw > 0 else 1
+        tv2 = (v + h) / ih if ih > 0 else 1
+
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+
+        if rotate != 0:
+            cx = dx + w / 2
+            cy = dy + h / 2
+            glPushMatrix()
+            glTranslatef(cx, cy, 0)
+            glRotatef(rotate, 0, 0, 1)
+            glTranslatef(-cx, -cy, 0)
+
+        glBegin(GL_QUADS)
+        glTexCoord2f(tu1, tv1); glVertex2f(dx, dy)
+        glTexCoord2f(tu2, tv1); glVertex2f(dx + w, dy)
+        glTexCoord2f(tu2, tv2); glVertex2f(dx + w, dy + h)
+        glTexCoord2f(tu1, tv2); glVertex2f(dx, dy + h)
+        glEnd()
+
+        if rotate != 0:
+            glPopMatrix()
+
+    def bltm(self, x, y, tm, u, v, w, h, colkey=None):
+        pass
+
+    def clip(self, x=None, y=None, w=None, h=None):
+        if x is None:
+            glDisable(GL_SCISSOR_TEST)
+            self._clip_rect = None
+        else:
+            glEnable(GL_SCISSOR_TEST)
+            sx = int(x)
+            sy = int(self._h * self._scale - (y + h))
+            sw = int(w)
+            sh = int(h)
+            glScissor(sx, sy, sw, sh)
+            self._clip_rect = (x, y, w, h)
+
+    def camera(self, x=None, y=None):
+        if x is None:
+            self._camera_x = 0
+            self._camera_y = 0
+        else:
+            self._camera_x = x
+            self._camera_y = y
+
+    def pal(self, col1=None, col2=None):
+        pass
+
+    def dither(self, alpha):
+        pass
+
+
+# ----------------------------------------------------------------------
+# Caméra
+# ----------------------------------------------------------------------
+class Camera:
+    def __init__(self, target, screen_width, screen_height,
+                 mouse_influence=0.2, mouse_limit=10):
+        self.target = target
+        self.width = screen_width
+        self.height = screen_height
+        self.mouse_influence = mouse_influence
+        self.mouse_limit = mouse_limit
+        self.shake_duration = 0
+        self.shake_intensity = 0
+        self.shake_offset_x = 0
+        self.shake_offset_y = 0
+        self.flash_color = (255, 255, 255)
+        self.flash_alpha = 0
+        self.flash_duration = 0
+        self.cam_x = 0
+        self.cam_y = 0
+
+    def shake(self, duration, intensity):
+        self.shake_duration = duration
+        self.shake_intensity = intensity
+
+    def flash(self, color, alpha, duration):
+        self.flash_color = color
+        self.flash_alpha = alpha
+        self.flash_duration = duration
+
+    def update(self):
+        global _global_mouse_pos
+        if self.flash_alpha > 0:
+            self.flash_duration -= 1
+            if self.flash_duration <= 0:
+                self.flash_alpha = max(0, self.flash_alpha - 8)
+
+        if self.shake_duration > 0:
+            self.shake_duration -= 1
+            if self.shake_duration % 5 == 0:
+                self.shake_intensity = max(0, self.shake_intensity - 1)
+        else:
+            self.shake_intensity = 0
+
+        if self.shake_intensity > 0:
+            self.shake_offset_x = random.randint(-self.shake_intensity, self.shake_intensity)
+            self.shake_offset_y = random.randint(-self.shake_intensity, self.shake_intensity)
+        else:
+            self.shake_offset_x = 0
+            self.shake_offset_y = 0
+
+        mx = mouse_x()
+        my = mouse_y()
+        _global_mouse_pos = (mx - self.cam_x, my - self.cam_y)
+        cx = self.width / 2
+        cy = self.height / 2
+        dx = (mx - cx) * self.mouse_influence
+        dy = (my - cy) * self.mouse_influence
+        dx = max(-self.mouse_limit, min(self.mouse_limit, dx))
+        dy = max(-self.mouse_limit, min(self.mouse_limit, dy))
+        tsx = cx - dx
+        tsy = cy - dy
+        self.cam_x = tsx - self.target.x + self.shake_offset_x
+        self.cam_y = tsy - self.target.y + self.shake_offset_y
+
+    def apply(self):
+        camera(self.cam_x, self.cam_y)
+
+
+# ----------------------------------------------------------------------
+# Application principale
+# ----------------------------------------------------------------------
+class App:
+    def __init__(self, width, height, title, fps, display_scale):
+        if not glfw.init():
+            raise RuntimeError("Échec glfw.init()")
+
+        glfw.window_hint(glfw.RESIZABLE, glfw.FALSE)
+        glfw.window_hint(glfw.SCALE_TO_MONITOR, glfw.TRUE)
+
+        self.width = width
+        self.height = height
+        self.display_scale = display_scale
+        self.fps = fps
+        self.frame_count = 0
+        self.mouse_x = 0
+        self.mouse_y = 0
+        self.running = False
+
+        win_w = width * display_scale
+        win_h = height * display_scale
+        self._window = glfw.create_window(int(win_w), int(win_h), title, None, None)
+        if not self._window:
+            glfw.terminate()
+            raise RuntimeError("Échec création fenêtre GLFW")
+
+        glfw.make_context_current(self._window)
+        # VSync désactivé par défaut (compatible headless / tout environnement)
+        glfw.swap_interval(0)
+
+        self.input = Input(self._window)
+        self.graphics = Graphics(width, height, display_scale)
+        self.audio = Audio()
+        self.resources = Resources()
+
+    def run(self, update, draw):
+        self.running = True
+        clock = glfw.get_time()
+        target_dt = 1.0 / self.fps
+
+        while self.running and not glfw.window_should_close(self._window):
+            now = glfw.get_time()
+            dt = now - clock
+            clock = now
+
+            glfw.poll_events()
+
+            # Mouse position en coordonnées logiques
+            mx, my = glfw.get_cursor_pos(self._window)
+            self.mouse_x = mx / self.display_scale
+            self.mouse_y = my / self.display_scale
+
+            # Flash overlay
+            g = self.graphics
+            if g.screen and hasattr(self, '_flash') and self._flash_alpha > 0:
+                pass  # flash géré via entité
+
+            try:
+                update()
+                draw()
+            except Exception as err:
+                import traceback
+                traceback.print_exc()
+                self.running = False
+
+            self.input.update()
+            glfw.swap_buffers(self._window)
+            self.frame_count += 1
+
+            # Attente pour respecter le FPS
+            elapsed = glfw.get_time() - now
+            sleep = target_dt - elapsed
+            if sleep > 0:
+                import time
+                time.sleep(sleep)
+
+        self.quit()
+
+    def quit(self):
+        self.running = False
+        glfw.terminate()
+        sys.exit()
+
+
+# ----------------------------------------------------------------------
+# Interface globale
+# ----------------------------------------------------------------------
+_app = None
+_width = 256
+_height = 256
+_global_mouse_pos = (0, 0)
+
+graphics = Graphics(256, 256, 1)
+input = Input(None) if False else None  # placeholder
+resources = Resources()
+audio = Audio()
+
+
+def init(width, height, title="Pyxel Compat", fps=30, display_scale=1):
+    global _app, _width, _height, graphics, input, resources, audio
+    _width = width
+    _height = height
+    _app = App(width, height, title, fps, display_scale)
+    graphics = _app.graphics
+    input = _app.input
+    resources = _app.resources
+    audio = _app.audio
+
+
+def run(update, draw):
+    if not _app:
+        raise RuntimeError("Appel e.init() d'abord")
+    _app.run(update, draw)
+
+
+def quit():
+    if _app:
+        _app.quit()
+
+
+def width():
+    return _width
+
+
+def height():
+    return _height
+
+
+def frame_count():
+    return _app.frame_count if _app else 0
+
+
+def mouse_x():
+    return _app.mouse_x if _app else 0
+
+
+def mouse_y():
+    return _app.mouse_y if _app else 0
+
+
+# Délégation graphique
+def cls(color):
+    graphics.cls(color)
+
+def pset(x, y, color):
+    graphics.pset(x, y, color)
+
+def pget(x, y):
+    return graphics.pget(x, y)
+
+def line(x1, y1, x2, y2, color):
+    graphics.line(x1, y1, x2, y2, color)
+
+def rect(x, y, w, h, color):
+    graphics.rect(x, y, w, h, color)
+
+def rectb(x, y, w, h, color):
+    graphics.rectb(x, y, w, h, color)
+
+def circ(x, y, r, color):
+    graphics.circ(x, y, r, color)
+
+def circb(x, y, r, color):
+    graphics.circb(x, y, r, color)
+
+def elli(x, y, w, h, color):
+    graphics.elli(x, y, w, h, color)
+
+def ellib(x, y, w, h, color):
+    graphics.ellib(x, y, w, h, color)
+
+def tri(x1, y1, x2, y2, x3, y3, color):
+    graphics.tri(x1, y1, x2, y2, x3, y3, color)
+
+def trib(x1, y1, x2, y2, x3, y3, color):
+    graphics.trib(x1, y1, x2, y2, x3, y3, color)
+
+def text(x, y, s, color, font=None):
+    graphics.text(x, y, s, color, font)
+
+def blt(x, y, img, u, v, w, h, colkey=None, rotate=0):
+    graphics.blt(x, y, img, u, v, w, h, colkey, rotate)
+
+def bltm(x, y, tm, u, v, w, h, colkey=None):
+    graphics.bltm(x, y, tm, u, v, w, h, colkey)
+
+def clip(x=None, y=None, w=None, h=None):
+    graphics.clip(x, y, w, h)
+
+def camera(x=None, y=None):
+    graphics.camera(x, y)
+
+def pal(col1=None, col2=None):
+    graphics.pal(col1, col2)
+
+def dither(alpha):
+    graphics.dither(alpha)
+
+# Délégation entrée
+def mouse_btn(button):
+    return input.mouse_btn(button) if input else False
+
+def mouse_btnp(button):
+    return input.mouse_btnp(button) if input else False
+
+def mouse_btnr(button):
+    return input.mouse_btnr(button) if input else False
+
+def btn(key):
+    return input.btn(key) if input else False
+
+def btnp(key, hold=0, period=0):
+    return input.btnp(key, hold, period) if input else False
+
+def btnr(key):
+    return input.btnr(key) if input else False

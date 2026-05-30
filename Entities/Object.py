@@ -1,5 +1,5 @@
 from Engine import engine as e
-
+import random
 
 class Object:
     def __init__(self, x: int, y: int, w: int, h: int, bank, speed=1):

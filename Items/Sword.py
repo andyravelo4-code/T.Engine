@@ -13,9 +13,9 @@ class Sword(Item):
 
     def __init__(self, x, y, w, h, bank, parent=None, speed=1, damage=25,
                  shadow_pos=(0, 0), dropped_pos=(3, 9), held_pos=(2, 9),
-                 cooldown=20):
+                 cooldown=20,name=""):
         super().__init__(x, y, w, h, bank, parent, speed,
-                         name="Epée", stackable=False, max_stack=1)
+                         name=name, stackable=False, max_stack=1)
         self.damage = damage
         self.shadow_pos = shadow_pos
         self.dropped_pos = dropped_pos

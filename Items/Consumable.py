@@ -30,7 +30,7 @@ class Consumable(Item):
 
     def draw(self):
         if not self.picked_up:
-            self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=30)
+            self.draw_image(self.dropped_pos[0], self.dropped_pos[1])
         elif self.parent and self.parent.current_item == self:
             pass
 

@@ -141,7 +141,7 @@ class Npc(Object):
             alpha = int(255 * (1.0 - progress))
             surf = pygame.Surface((32, 32), pygame.SRCALPHA)
             center = (16, 16)
-            radius = 7 + progress * 3
+            radius = 8 + progress * 3
             points = []
             for i in range(-80, 81, 8):
                 rad = math.radians(i) + self.punch_angle
@@ -162,13 +162,13 @@ class Npc(Object):
         # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
-            color = (0, 255, 0,70)
+            color = (95, 255, 129, 60)
         elif health_ratio > 0.3:
             color = (255, 255, 0,70)
         else:
             color = (255, 0, 0,70)
 
-        e.circb(int(self.x + self.w / 2), int(self.y-2), 2, color)
+        e.pset(int(self.x-1 + self.w / 2), int(self.y), color)
 
     def update(self):
         world = self.world

@@ -428,7 +428,8 @@ class App:
         self.height = height
         self.display_scale = display_scale
         self.screen = pygame.display.set_mode(
-            (width * display_scale, height * display_scale)
+            (width, height),
+            pygame.SCALED | pygame.RESIZABLE,
         )
         pygame.display.set_caption(title)
         self.clock = pygame.time.Clock()
@@ -453,8 +454,6 @@ class App:
                 self.input.handle_event(event)
 
             self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
-            self.mouse_x //= self.display_scale
-            self.mouse_y //= self.display_scale
 
             try:
                 update()
@@ -466,11 +465,7 @@ class App:
 
             self.input.update()
 
-            scaled = pygame.transform.scale(
-                self.virtual_screen,
-                (self.width * self.display_scale, self.height * self.display_scale),
-            )
-            self.screen.blit(scaled, (0, 0))
+            self.screen.blit(self.virtual_screen, (0, 0))
             pygame.display.flip()
             self.frame_count += 1
             self.clock.tick(self.fps)

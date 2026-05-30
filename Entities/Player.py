@@ -28,6 +28,13 @@ class Player(Object):
         self.crafting = [None] * self.MAX_CRAFTING
         self.equipment = [None, None]
         self.current_item = None
+        self.velocity_x = 0.0
+        self.velocity_y = 0.0
+        self._rem_x = 0.0
+        self._rem_y = 0.0
+        self.acceleration = 0.35
+        self.friction = 0.85
+        self.max_speed = 1.4
 
     def draw(self):
         e.blt(
@@ -68,7 +75,7 @@ class Player(Object):
         else:
             color = (255, 0, 0, 60)
 
-        e.circb(int(self.x + self.w / 2), int(self.y - 1.5), 2, color)
+        e.pset(int(self.x-1 + self.w / 2), int(self.y-1), color)
 
         if self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
@@ -138,34 +145,58 @@ class Player(Object):
             self._cycle_weapon()
 
         moving = False
-        dx = 0
-        dy = 0
+
+        self.velocity_x *= self.friction
+        self.velocity_y *= self.friction
+
         if e.btn(e.KEY_W) or e.btn(e.KEY_Z):
             self.direction = "up"
-            dy -= self.speed
+            self.velocity_y -= self.acceleration
             self.last_dir = "up"
             moving = True
         if e.btn(e.KEY_S):
             self.direction = "down"
-            dy += self.speed
+            self.velocity_y += self.acceleration
             self.last_dir = "down"
             moving = True
         if e.btn(e.KEY_A) or e.btn(e.KEY_Q):
             self.direction = "left"
-            dx -= self.speed
+            self.velocity_x -= self.acceleration
             self.last_dir = "left"
             moving = True
         if e.btn(e.KEY_D):
             self.direction = "right"
-            dx += self.speed
+            self.velocity_x += self.acceleration
             self.last_dir = "right"
             moving = True
+
+        if abs(self.velocity_x) < 0.05:
+            self.velocity_x = 0.0
+        if abs(self.velocity_y) < 0.05:
+            self.velocity_y = 0.0
+
+        speed = math.hypot(self.velocity_x, self.velocity_y)
+        if speed > self.max_speed:
+            ratio = self.max_speed / speed
+            self.velocity_x *= ratio
+            self.velocity_y *= ratio
+
+        if not moving and speed > 0.20:
+            moving = True
+            if abs(self.velocity_x) > abs(self.velocity_y):
+                self.direction = "right" if self.velocity_x > 0 else "left"
+            else:
+                self.direction = "down" if self.velocity_y > 0 else "up"
+            self.last_dir = self.direction
+
+        self._rem_x += self.velocity_x
+        self._rem_y += self.velocity_y
 
         if not self.current_item and self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
             lunge_speed = 3.5 * (1.0 - progress)
-            dx += math.cos(self.punch_angle) * lunge_speed
-            dy += math.sin(self.punch_angle) * lunge_speed
+            self._rem_x += math.cos(self.punch_angle) * lunge_speed
+            self._rem_y += math.sin(self.punch_angle) * lunge_speed
             moving = True
 
         if self.current_item and getattr(self.current_item, "is_slashing", False):
@@ -179,9 +210,14 @@ class Player(Object):
             slash_angle = math.atan2(target_y - self.y, target_x - self.x)
             progress = 1.0 - (self.current_item.slash_timer / self.current_item.slash_duration)
             lunge_speed = 3.5 * (1.0 - progress)
-            dx += math.cos(slash_angle) * lunge_speed
-            dy += math.sin(slash_angle) * lunge_speed
+            self._rem_x += math.cos(slash_angle) * lunge_speed
+            self._rem_y += math.sin(slash_angle) * lunge_speed
             moving = True
+
+        dx = int(self._rem_x)
+        dy = int(self._rem_y)
+        self._rem_x -= dx
+        self._rem_y -= dy
 
         if dx != 0:
             self.x += dx
@@ -198,6 +234,22 @@ class Player(Object):
                     if self.is_collid(obj):
                         self.y -= dy
                         break
+
+        if self.is_punching or (self.current_item and getattr(self.current_item, "is_slashing", False)):
+            angle = math.atan2(
+                e._global_mouse_pos[1] - (self.y + self.h / 2),
+                e._global_mouse_pos[0] - (self.x + self.w / 2),
+            )
+            deg = math.degrees(angle)
+            if -45 <= deg <= 45:
+                self.last_dir = "right"
+            elif 45 < deg <= 135:
+                self.last_dir = "down"
+            elif deg > 135 or deg <= -135:
+                self.last_dir = "left"
+            elif -135 < deg < -45:
+                self.last_dir = "up"
+            self.direction = "idle"
 
         if not moving:
             mouse_angle = math.atan2(
