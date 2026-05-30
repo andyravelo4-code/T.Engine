@@ -1,4 +1,4 @@
-# T.engine
+# Tiavina.engine
 
 Moteur de jeu 2D pixel art, construit sur **Pygame**.  
 Fonctionne avec un **écran virtuel** (résolution logique) mis à l'échelle entière vers la fenêtre d'affichage.
@@ -6,7 +6,7 @@ Fonctionne avec un **écran virtuel** (résolution logique) mis à l'échelle en
 ## Installation
 
 ```bash
-pip install T.engine
+pip install Tiavina.engine
 ```
 
 ```python

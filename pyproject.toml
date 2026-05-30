@@ -3,8 +3,8 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "T.engine"
-version = "0.1.0"
+name = "Tiavina.engine"
+version = "0.2.0"
 description = "Moteur de jeu 2D sur Pygame"
 readme = "README.md"
 license = "GPL-3.0-only"

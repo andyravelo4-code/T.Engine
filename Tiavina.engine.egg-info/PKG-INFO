@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
-Name: T.engine
-Version: 0.1.0
+Name: Tiavina.engine
+Version: 0.2.0
 Summary: Moteur de jeu 2D sur Pygame
 License-Expression: GPL-3.0-only
 Project-URL: Homepage, https://github.com/andyravelo4-code/
@@ -23,7 +23,7 @@ License-File: LICENSE
 Requires-Dist: pygame>=2.0.0
 Dynamic: license-file
 
-# T.engine
+# Tiavina.engine
 
 Moteur de jeu 2D pixel art, construit sur **Pygame**.  
 Fonctionne avec un **écran virtuel** (résolution logique) mis à l'échelle entière vers la fenêtre d'affichage.
@@ -31,7 +31,7 @@ Fonctionne avec un **écran virtuel** (résolution logique) mis à l'échelle en
 ## Installation
 
 ```bash
-pip install T.engine
+pip install Tiavina.engine
 ```
 
 ```python
