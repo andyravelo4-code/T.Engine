@@ -141,10 +141,6 @@ clip(x, y, w, h)    → active le rectangle de clipping
 clip()              → désactive
 ```
 
-## Stubs (non implémentés)
-
-`pal()`, `dither()`, `bltm()`, `Resources.load()`, `Resources.tilemap()`
-
 ## Exemple complet
 
 ```python
