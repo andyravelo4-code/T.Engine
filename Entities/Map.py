@@ -65,7 +65,7 @@ class Map:
         "hills": {3, 5, 6,4},
         "rocky_plains": {1, 5},
         "forest": {3, 5, 6},
-        "desert": {5,2},
+        "desert": {5,2,4},
         "mountains": {5},
     }
 

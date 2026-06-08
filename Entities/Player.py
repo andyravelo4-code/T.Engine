@@ -210,10 +210,10 @@ class Player(Object):
 
             slash_angle = math.atan2(target_y - self.y, target_x - self.x)
             progress = 1.0 - (self.current_item.slash_timer / self.current_item.slash_duration)
-            lunge_speed = 3.5 * (1.0 - progress)
+            lunge_speed = 4.5 * (1.0 - progress)
             self._rem_x += math.cos(slash_angle) * lunge_speed
             self._rem_y += math.sin(slash_angle) * lunge_speed
-            moving = True
+            moving = True            
 
         dx = int(self._rem_x)
         dy = int(self._rem_y)

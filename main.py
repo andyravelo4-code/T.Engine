@@ -10,7 +10,7 @@ from Items.Crossbow import Crossbow
 from Items.Consumable import Consumable
 from Entities.Chest import Chest
 
-MAP_MODE = "single"
+MAP_MODE = "island"
 MAP_BIOME = "dungeon"
 MAP_BIOMES = [ "desert"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
 
@@ -60,10 +60,15 @@ if MAP_MODE == "single":
             {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 90, "punch_damage": 8, "punch_cooldown": 50},
         ],
         item_configs=[
-            {"cls": Sword, "bank": stuff, "name": "Sword", "damage": 30, "dropped_pos": (3, 9), "count": 2},
+            {"cls": Sword, "bank": stuff, "name": "Sword", "damage": 30, "dropped_pos": (5, 9), "count": 2 , "held_pos":(4,9) },
             {"cls": Crossbow, "bank": stuff, "name": "Crossbow", "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
+            {"cls": Chest, "bank": stuff, "image_x": 0, "image_y": 5, "placed_pos": (7, 10), "count": 1,}
         ],
+        tile_images={
+            4 : {"bank":stuff,"image_x":1,"image_y":5}
+        },
+        tile_whitelist=(1,2,3,5,4)
     )
 elif MAP_MODE == "island":
     game_map.generate_island(
@@ -82,9 +87,12 @@ elif MAP_MODE == "island":
             {"cls": Chest, "bank": stuff, "image_x": 0, "image_y": 5, "placed_pos": (5, 10), "count": 1,
              "items": [
                  {"cls": Sword, "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "name": "Excalibour"},
-                 {"cls": Consumable, "bank": stuff, "name": "Potion", "heal_amount": 20, "dropped_pos": (0, 0)},
+                 {"cls": Consumable, "bank": stuff, "name": "Potion", "heal_amount": 20, "dropped_pos": (2, 0)},
              ]},
         ],
+        tile_images={
+            4:{"bank":stuff,"image_x":2,"image_y":5}
+        }
     )
 elif MAP_MODE == "surface":
     game_map.generate_surface(

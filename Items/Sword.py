@@ -122,7 +122,7 @@ class Sword(Item):
                 draw = ImageDraw.Draw(surf)
                 
                 center = (32, 32)
-                radius = 13+ progress * 5
+                radius = 10+ progress * 5
                 
                 current_angle = self.start_slash_angle + (math.pi * 1.0 * progress * self.p)
                 points = []
