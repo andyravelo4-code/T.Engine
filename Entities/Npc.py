@@ -14,8 +14,10 @@ class Npc(Object):
         aggressive=True, max_health=100,
         speed=0.3, detection_radius=20, attack_radius=10,
         punch_damage=5, punch_duration=10, punch_cooldown=40,
+        name="",
     ):
         super().__init__(x, y, w, h, frames_dict["bank"])
+        self.name = name
         self.aggressive = aggressive
         self.max_health = max_health
         self.health = max_health
@@ -292,42 +294,36 @@ class Npc(Object):
             return
 
         if dist < current_attack_radius:
-            self.state = "attack" if world.active_npc is self else "idle"
-            if self.state == "attack":
-                self._face_target()
-                if self.attack_cooldown <= 0:
-                    if self.current_item:
-                        if hasattr(self.current_item, "slash") and not getattr(
-                            self.current_item, "is_slashing", False
-                        ):
-                            self.current_item.slash()
-                            self.attack_cooldown = getattr(self.current_item, "cooldown", 20)
-                        elif hasattr(self.current_item, "fire") and not getattr(
-                            self.current_item, "is_firing", False
-                        ):
-                            angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
-                            self.current_item.fire(angle)
-                            self.attack_cooldown = getattr(self.current_item, "cooldown", 30)
-                    elif not self.is_punching:
-                        self.is_punching = True
-                        self.punch_timer = self.punch_duration
-                        self.hit_entities = []
-                        self.punch_angle = math.atan2(
-                            self.target.y - (self.y + self.h/2),
-                            self.target.x - (self.x + self.w/2)
-                        )
-                        self.attack_cooldown = self.punch_cooldown
-            if self.state == "idle":
-                self.path = []
+            self.state = "attack"
+            self._face_target()
+            if self.attack_cooldown <= 0:
+                if self.current_item:
+                    if hasattr(self.current_item, "slash") and not getattr(
+                        self.current_item, "is_slashing", False
+                    ):
+                        self.current_item.slash()
+                        self.attack_cooldown = getattr(self.current_item, "cooldown", 20)
+                    elif hasattr(self.current_item, "fire") and not getattr(
+                        self.current_item, "is_firing", False
+                    ):
+                        angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
+                        self.current_item.fire(angle)
+                        self.attack_cooldown = getattr(self.current_item, "cooldown", 30)
+                elif not self.is_punching:
+                    self.is_punching = True
+                    self.punch_timer = self.punch_duration
+                    self.hit_entities = []
+                    self.punch_angle = math.atan2(
+                        self.target.y - (self.y + self.h/2),
+                        self.target.x - (self.x + self.w/2)
+                    )
+                    self.attack_cooldown = self.punch_cooldown
 
         if self.is_punching:
             self._update_punch()
         elif dist < self.detection_radius:
-            self.state = "chase" if world.active_npc is self else "idle"
-            if self.state == "chase":
-                self._follow_path(self.target.x, self.target.y)
-            if self.state == "idle":
-                self.path = []
+            self.state = "chase"
+            self._follow_path(self.target.x, self.target.y)
         else:
             self.state = "idle"
             self.path = []

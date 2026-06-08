@@ -56,7 +56,7 @@ def spawn_blood(x, y, world, amount=10):
         
         # Red tones
         color = (random.randint(180, 255), 0, 0,255)
-        lifetime = random.randint(15, 30)
+        lifetime = random.randint(25, 30)
         
         p = Particle(x, y, vx, vy, color, lifetime, size=1)
         world.add(p)
@@ -73,7 +73,7 @@ def spawn_dust(x, y, world, amount=3):
         color = (val, val - 10, val - 20, 150)
         lifetime = random.randint(10, 20)
         
-        p = Particle(x, y, vx, vy, color, lifetime, size=1)
+        p = Particle(x-1, y, vx, vy, color, lifetime, size=1)
         world.add(p)
 
 def spawn_hit(x, y, world, amount=5):

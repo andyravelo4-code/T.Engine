@@ -182,7 +182,7 @@ class Player(Object):
             self.velocity_x *= ratio
             self.velocity_y *= ratio
 
-        if not moving and speed > 0.20:
+        if not moving and speed > 0.30:
             moving = True
             if abs(self.velocity_x) > abs(self.velocity_y):
                 self.direction = "right" if self.velocity_x > 0 else "left"

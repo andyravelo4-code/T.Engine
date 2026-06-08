@@ -10,8 +10,8 @@ from Items.Crossbow import Crossbow
 from Items.Consumable import Consumable
 from Entities.Chest import Chest
 
-MAP_MODE = "island"     # "single" (dungeon/cave/island), "island" (noise+biomes), "surface" (noise+biomes), "multi" (stripes)
-MAP_BIOME = "dungeon"   # used when MAP_MODE is "single"
+MAP_MODE = "single"
+MAP_BIOME = "dungeon"
 MAP_BIOMES = [ "desert"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
 
 e.init(200, 200, title="Game", fps=60, display_scale=5, pixel_art=True)
@@ -54,14 +54,14 @@ world.map = game_map
 if MAP_MODE == "single":
     game_map.generate(
         MAP_BIOME, 20, 20,
-        npc_count=8, player=player,
+        npc_count=2, player=player,
         npc_configs=[
             {"frames_dict": frames_dict, "max_health": 80, "speed": 0.6, "punch_damage": 4, "punch_cooldown": 40},
             {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 90, "punch_damage": 8, "punch_cooldown": 50},
         ],
         item_configs=[
-            {"cls": Sword, "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
-            {"cls": Crossbow, "bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Sword, "bank": stuff, "name": "Sword", "damage": 30, "dropped_pos": (3, 9), "count": 2},
+            {"cls": Crossbow, "bank": stuff, "name": "Crossbow", "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )

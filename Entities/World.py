@@ -78,10 +78,19 @@ class World:
 
     def draw(self):
         """Dessine d'abord les blocs (fond), puis les entités triées par y."""
+        cam_x = engine.graphics._camera_x
+        cam_y = engine.graphics._camera_y
+        sw = engine.width()
+        sh = engine.height()
+
         blocks = [e for e in self.entities if isinstance(e, Block)]
-        others = [e for e in self.entities if not isinstance(e, Block)]
         for e in blocks:
-            e.draw()
+            sx = e.x + cam_x
+            sy = e.y + cam_y
+            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh:
+                e.draw()
+
+        others = [e for e in self.entities if not isinstance(e, Block)]
         for e in sorted(others, key=lambda e: e.y):
             e.draw()
 

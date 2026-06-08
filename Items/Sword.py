@@ -122,7 +122,7 @@ class Sword(Item):
                 draw = ImageDraw.Draw(surf)
                 
                 center = (32, 32)
-                radius = 12+ progress * 5
+                radius = 13+ progress * 5
                 
                 current_angle = self.start_slash_angle + (math.pi * 1.0 * progress * self.p)
                 points = []
@@ -144,7 +144,7 @@ class Sword(Item):
                     points.append((px, py))
                 
                 if len(points) >= 3:
-                    draw.polygon(points, fill=(255, 255, 255, (alpha+50)%255))
+                    draw.polygon(points, fill=(255, 255, 255, (alpha)%255))
                 
                 e.graphics.screen.blit(surf, (self.parent.x + self.parent.w/2 - 32 + e.graphics._camera_x, self.parent.y + self.parent.h/2 - 32 + e.graphics._camera_y))
 
