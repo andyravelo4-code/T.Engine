@@ -528,7 +528,9 @@ def update_game():
                 if i is not j:
                     princ = ais[i]
                     other = ais[j]
-                    if math.dist([ais[i].x,ais[i].y],[ais[j].x,ais[j].y]) <= 20:
+                    dx = ais[i].x - ais[j].x
+                    dy = ais[i].y - ais[j].y
+                    if dx * dx + dy * dy <= 400:
                         other.etat = 'marcher'
                     elif (princ.dist < other.dist):
                         if princ.hp > 6:

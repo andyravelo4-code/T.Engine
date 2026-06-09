@@ -197,6 +197,8 @@ def default_font(size=6):
 # ScreenWrapper – émule e.graphics.screen.blit() / fill() / set_at() / get_at()
 # ----------------------------------------------------------------------
 class _Screen:
+    _cleanup_chain = []
+
     def __init__(self, width, height):
         self._w = width
         self._h = height
@@ -239,15 +241,23 @@ class _Screen:
             pil_img = pil_img.crop((u, v, u + w, v + h))
         w, h = pil_img.size
 
-        tex = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, tex)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                     pil_img.tobytes())
+        tex_id = getattr(pil_img, '_tex_id', None)
+        if tex_id is not None:
+            tex = tex_id
+            glBindTexture(GL_TEXTURE_2D, tex)
+        else:
+            tex = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, tex)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                         pil_img.tobytes())
+            pil_img._tex_id = tex
 
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_TEXTURE_2D)
         glBegin(GL_QUADS)
         glTexCoord2f(0, 0); glVertex2i(dx, dy)
@@ -255,7 +265,34 @@ class _Screen:
         glTexCoord2f(1, 1); glVertex2i(dx + w, dy + h)
         glTexCoord2f(0, 1); glVertex2i(dx, dy + h)
         glEnd()
-        glDeleteTextures(1, [tex])
+
+    def fill_polygon(self, points, color):
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glColor4f(*c)
+        glBegin(GL_TRIANGLE_FAN)
+        for px, py in points:
+            glVertex2i(int(px), int(py))
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+
+    def fill_rect(self, x, y, w, h, color):
+        c = _norm_color(color)
+        glDisable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glColor4f(*c)
+        glBegin(GL_QUADS)
+        glVertex2i(x, y)
+        glVertex2i(x + w, y)
+        glVertex2i(x + w, y + h)
+        glVertex2i(x, y + h)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
 
     def fill(self, color):
         c = _norm_color(color)
@@ -891,8 +928,8 @@ class Graphics:
 
     # --- Blit ---
     def blt(self, x, y, img, u, v, w, h, colkey=None, rotate=0):
-        dx = x + self._camera_x
-        dy = y + self._camera_y
+        dx = round(x + self._camera_x)
+        dy = round(y + self._camera_y)
 
         if rotate != 0:
             if isinstance(img, _Img):

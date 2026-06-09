@@ -16,6 +16,7 @@ class Object:
         self.blocking = False
         self.is_living = False
         self.hitbox_inset = 0
+        self.pushable = False
         self.max_health = 100
         self.health = 100
 

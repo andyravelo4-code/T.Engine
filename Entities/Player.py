@@ -1,4 +1,5 @@
 import math
+
 from PIL import Image, ImageDraw
 
 from Engine import engine as e
@@ -78,33 +79,29 @@ class Player(Object):
         e.pset(int(self.x-1 + self.w / 2), int(self.y-1), color)
 
         if self.is_punching:
-            progress = 1.0 - (self.punch_timer / self.punch_duration)
-            alpha = int(255 * (1.0 - progress))
-            surf = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(surf)
-
-            center = (16, 16)
-            radius = 7 + progress * 3
-            points = []
-
-            for i in range(-80, 81, 8):
-                rad = math.radians(i) + self.punch_angle
-                px = center[0] + math.cos(rad) * radius
-                py = center[1] + math.sin(rad) * radius
-                points.append((px, py))
-
-            for i in range(80, -81, -8):
-                rad = math.radians(i) + self.punch_angle
-                thickness = 2.5 * math.cos(math.radians(i / 80 * 90))
-                r = radius - thickness
-                px = center[0] + math.cos(rad) * r
-                py = center[1] + math.sin(rad) * r
-                points.append((px, py))
-
-            if len(points) >= 3:
-                draw.polygon(points, fill=(255, 255, 255, alpha))
-
-            e.graphics.screen.blit(surf, (
+            if not hasattr(self, '_punch_cache') or self._punch_angle != self.punch_angle:
+                self._punch_cache = {}
+                self._punch_angle = self.punch_angle
+                for t in range(self.punch_duration + 1):
+                    progress = 1.0 - t / self.punch_duration
+                    alpha = int(255 * (1.0 - progress))
+                    radius = 7 + progress * 3
+                    surf = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(surf)
+                    cx, cy = 16, 16
+                    pts = []
+                    for i in range(-80, 81, 8):
+                        rad = math.radians(i) + self.punch_angle
+                        pts.append((cx + math.cos(rad) * radius, cy + math.sin(rad) * radius))
+                    for i in range(80, -81, -8):
+                        rad = math.radians(i) + self.punch_angle
+                        t2 = 2.5 * math.cos(math.radians(i / 80 * 90))
+                        r = radius - t2
+                        pts.append((cx + math.cos(rad) * r, cy + math.sin(rad) * r))
+                    if len(pts) >= 3:
+                        draw.polygon(pts, fill=(255, 255, 255, alpha))
+                    self._punch_cache[t] = surf
+            e.graphics.screen.blit(self._punch_cache[self.punch_timer], (
                 self.x + self.w / 2 - 16 + e.graphics._camera_x,
                 self.y + self.h / 2 - 16 + e.graphics._camera_y,
             ))
@@ -113,8 +110,15 @@ class Player(Object):
         world = self.world
         self.direction = "idle"
 
+        # capture l'état d'attaque AVANT item.update() pour éviter
+        # le trou d'un frame quand le timer du slash expire
+        in_attack = self.is_punching
         if self.current_item:
+            if getattr(self.current_item, "is_slashing", False):
+                in_attack = True
             self.current_item.update()
+            if getattr(self.current_item, "is_slashing", False):
+                in_attack = True
 
         if e.btnp(e.KEY_E):
             from Entities.Item import Item
@@ -176,13 +180,14 @@ class Player(Object):
         if abs(self.velocity_y) < 0.05:
             self.velocity_y = 0.0
 
-        speed = math.hypot(self.velocity_x, self.velocity_y)
-        if speed > self.max_speed:
-            ratio = self.max_speed / speed
+        speed2 = self.velocity_x * self.velocity_x + self.velocity_y * self.velocity_y
+        max_s2 = self.max_speed * self.max_speed
+        if speed2 > max_s2:
+            ratio = self.max_speed / math.sqrt(speed2)
             self.velocity_x *= ratio
             self.velocity_y *= ratio
 
-        if not moving and speed > 0.30:
+        if not moving and speed2 > 0.09:
             moving = True
             if abs(self.velocity_x) > abs(self.velocity_y):
                 self.direction = "right" if self.velocity_x > 0 else "left"
@@ -195,7 +200,7 @@ class Player(Object):
 
         if not self.current_item and self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
-            lunge_speed = 3.5 * (1.0 - progress)
+            lunge_speed = 4 * (1.0 - progress)
             self._rem_x += math.cos(self.punch_angle) * lunge_speed
             self._rem_y += math.sin(self.punch_angle) * lunge_speed
             moving = True
@@ -220,23 +225,48 @@ class Player(Object):
         self._rem_x -= dx
         self._rem_y -= dy
 
+        # Collecter les entités bloquantes une seule fois (via spatial hash)
+        near = world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 20) if world else []
+        blocking = [
+            obj for obj in near
+            if getattr(obj, "blocking", False) and obj != self and not isinstance(obj, Npc)
+        ]
+
+        # Axe X : pixel par pixel pour un glissement fluide
         if dx != 0:
-            self.x += dx
-            for obj in world.entities:
-                if getattr(obj, "blocking", False) and obj != self and not isinstance(obj, Npc):
+            step_x = 1 if dx > 0 else -1
+            for _ in range(abs(dx)):
+                self.x += step_x
+                blocked = False
+                for obj in blocking:
                     if self.is_collid(obj):
-                        self.x -= dx
+                        if getattr(obj, "pushable", False) and self._try_push(obj, step_x, 0, blocking):
+                            continue
+                        self.x -= step_x
+                        self.velocity_x = 0
+                        blocked = True
                         break
+                if blocked:
+                    break
 
+        # Axe Y : pixel par pixel
         if dy != 0:
-            self.y += dy
-            for obj in world.entities:
-                if getattr(obj, "blocking", False) and obj != self and not isinstance(obj, Npc):
+            step_y = 1 if dy > 0 else -1
+            for _ in range(abs(dy)):
+                self.y += step_y
+                blocked = False
+                for obj in blocking:
                     if self.is_collid(obj):
-                        self.y -= dy
+                        if getattr(obj, "pushable", False) and self._try_push(obj, 0, step_y, blocking):
+                            continue
+                        self.y -= step_y
+                        self.velocity_y = 0
+                        blocked = True
                         break
+                if blocked:
+                    break
 
-        if self.is_punching or (self.current_item and getattr(self.current_item, "is_slashing", False)):
+        if in_attack:
             angle = math.atan2(
                 e._global_mouse_pos[1] - (self.y + self.h / 2),
                 e._global_mouse_pos[0] - (self.x + self.w / 2),
@@ -250,7 +280,7 @@ class Player(Object):
                 self.last_dir = "left"
             elif -135 < deg < -45:
                 self.last_dir = "up"
-            self.direction = "idle"
+            self.direction = self.last_dir
 
         if not moving:
             mouse_angle = math.atan2(
@@ -287,16 +317,14 @@ class Player(Object):
         if self.is_punching:
             self.punch_timer -= 1
             if self.world:
-                for entity in self.world.entities:
+                for entity in self.world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 24):
                     if entity is self or not hasattr(entity, 'take_damage'):
                         continue
                     if not entity.is_living and not getattr(entity, 'blocking', False):
                         continue
-                    dist = math.hypot(
-                        entity.x + entity.w / 2 - self.x,
-                        entity.y + entity.h / 2 - self.y,
-                    )
-                    if dist < 18 and entity not in self.hit_entities:
+                    dx = entity.x + entity.w / 2 - self.x
+                    dy = entity.y + entity.h / 2 - self.y
+                    if dx * dx + dy * dy < 324 and entity not in self.hit_entities:
                         angle_to_entity = math.atan2(
                             entity.y + entity.h / 2 - (self.y + self.h / 2),
                             entity.x + entity.w / 2 - (self.x + self.w / 2),
@@ -373,3 +401,19 @@ class Player(Object):
         if self.equipment[0] is not None and self.equipment[1] is not None:
             self.equipment[0], self.equipment[1] = self.equipment[1], self.equipment[0]
             self._sync_current_item()
+
+    def _try_push(self, obj, dx, dy, blocking_list, depth=0):
+        if depth > 4:
+            return False
+        old_x, old_y = obj.x, obj.y
+        obj.x += dx
+        obj.y += dy
+        for other in blocking_list:
+            if other is obj:
+                continue
+            if obj.is_collid(other):
+                if getattr(other, "pushable", False) and self._try_push(other, dx, dy, blocking_list, depth + 1):
+                    continue
+                obj.x, obj.y = old_x, old_y
+                return False
+        return True

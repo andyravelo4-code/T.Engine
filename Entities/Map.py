@@ -47,7 +47,9 @@ class Map:
 
     FALLBACK_COLORS = {
         "cave":    {1: (80, 75, 65), 3: (100, 220, 255)},
-        "dungeon": {1: (70, 65, 60), 2: (55, 50, 45), 3: (160, 140, 60), 4: (65, 50, 35), 5: (60, 55, 50)},
+        "dungeon": {1: (70, 65, 60), 2: (55, 50, 45), 3: (160, 140, 60), 4: (65, 50, 35), 5: (60, 55, 50),
+                    20: (85, 80, 75), 21: (85, 80, 75), 22: (75, 70, 65), 23: (75, 70, 65),
+                    24: (120, 105, 90), 25: (120, 105, 90), 26: (120, 105, 90), 27: (120, 105, 90)},
         "island":  {2: (10, 55, 85), 3: (181, 174, 145), 4: (70, 65, 60)},
         "plains":  {2: (10, 55, 85), 3: (60, 130, 60), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30)},
         "hills":   {2: (10, 55, 85), 3: (55, 120, 55), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30)},
@@ -197,6 +199,7 @@ class Map:
         }.get(biome, lambda: None)()
 
         self._filter_tiles(tile_whitelist)
+        self._classify_walls()
         self._build_blocks(tile_images)
 
         spawn = self.get_spawn_point()
@@ -254,7 +257,7 @@ class Map:
                     self.grid[y][wall_x] = 1
 
         # Classifie tous les murs (frontieres + sous-types dungeon).
-        # self._classify_walls()
+        self._classify_walls()
 
         self._build_blocks(tile_images)
 
@@ -539,67 +542,127 @@ class Map:
         if x2 is None:
             x2 = self.width
         self.room_tiles = set()
-        h, w = self.height, self.width
 
-        # Cellular automata (cave-like, B4/S5)
-        for y in range(h):
+        # Initialiser en vide (0)
+        for y in range(self.height):
             for x in range(x1, x2):
-                self.grid[y][x] = 1 if random.random() < 0.35 else 0
+                self.grid[y][x] = 0
 
-        for _ in range(5):
-            new = [row[:] for row in self.grid]
-            for y in range(1, h - 1):
-                for x in range(max(1, x1), min(x2, w - 1)):
-                    walls = sum(
-                        1 for dy in (-1, 0, 1) for dx in (-1, 0, 1)
-                        if (dx or dy) and 0 <= y + dy < h and 0 <= x + dx < w
-                        and self.grid[y + dy][x + dx] == 1
-                    )
-                    if self.grid[y][x] == 1:
-                        new[y][x] = 1 if walls >= 4 else 0
-                    else:
-                        new[y][x] = 1 if walls >= 5 else 0
-            self.grid = new
+        gap = 6
+        base_w, base_h = 7, 7
+        strip_w = x2 - x1
+        cols = max(2, strip_w // (base_w + gap))
+        rows = max(2, self.height // (base_h + gap))
 
-        # Flood fill: keep only the largest connected void area
-        cx, cy = (x1 + x2) // 2, h // 2
-        main_area = self._flood_find(x1, x2, cx, cy)
-        for y in range(h):
+        # Placer les salles
+        rooms = []
+        cx_list = []
+        cy_list = []
+        for gy in range(rows):
+            for gx in range(cols):
+                rx = x1 + gx * (base_w + gap) + random.randint(0, 1)
+                ry = gy * (base_h + gap) + random.randint(0, 1)
+                rw = base_w + random.randint(-1, 2)
+                rh = base_h + random.randint(-1, 2)
+                rx = max(x1 + 1, min(rx, x2 - rw - 2))
+                ry = max(1, min(ry, self.height - rh - 2))
+                if rw < 3 or rh < 3:
+                    continue
+                rooms.append((rx, ry, rw, rh))
+                cx_list.append(rx + rw // 2)
+                cy_list.append(ry + rh // 2)
+                for y in range(ry, ry + rh):
+                    for x in range(rx, rx + rw):
+                        self.grid[y][x] = 2
+                        self.room_tiles.add((x, y))
+
+        # Connecter les salles (minimum spanning tree)
+        parent = list(range(len(rooms)))
+        def find(u):
+            while parent[u] != u:
+                parent[u] = parent[parent[u]]
+                u = parent[u]
+            return u
+        def union(u, v):
+            ru, rv = find(u), find(v)
+            if ru != rv:
+                parent[rv] = ru
+
+        edges = []
+        for i in range(len(rooms)):
+            for j in range(i + 1, len(rooms)):
+                ax, ay = cx_list[i], cy_list[i]
+                bx, by = cx_list[j], cy_list[j]
+                dist = abs(ax - bx) + abs(ay - by)
+                edges.append((dist, i, j, ax, ay, bx, by))
+        edges.sort()
+
+        for dist, i, j, ax, ay, bx, by in edges:
+            if find(i) != find(j):
+                union(i, j)
+                for x in range(min(ax, bx), max(ax, bx) + 1):
+                    if x1 <= x < x2 and 0 <= ay < self.height:
+                        self.grid[ay][x] = 2
+                for y in range(min(ay, by), max(ay, by) + 1):
+                    if 0 <= y < self.height and x1 <= bx < x2:
+                        self.grid[y][bx] = 2
+
+        # Murs de bordure
+        for y in range(self.height):
             for x in range(x1, x2):
-                if self.grid[y][x] == 0 and (x, y) not in main_area:
+                if y == 0 or y == self.height - 1 or x == x1 or x == x2 - 1:
                     self.grid[y][x] = 1
 
-        # Convert void → walkable floor
-        for y in range(h):
+        # Murs fins : tout 0 adjacent à du sol (2) → 1
+        for y in range(self.height):
             for x in range(x1, x2):
-                if self.grid[y][x] == 0:
-                    self.grid[y][x] = 2
-
-        # Boundary walls
-        for y in range(h):
-            for x in range(x1, x2):
-                if y == 0 or y == h - 1 or x == x1 or x == x2 - 1:
+                if self.grid[y][x] != 0:
+                    continue
+                if any(
+                    0 <= ny < self.height and 0 <= nx < self.width
+                    and self.grid[ny][nx] == 2
+                    for ny in (y-1, y, y+1) for nx in (x-1, x, x+1)
+                    if (ny != y or nx != x)
+                ):
                     self.grid[y][x] = 1
 
-        # Water pools
-        for y in range(1, h - 1):
-            for x in range(max(1, x1), min(x2, w - 1)):
-                if self.grid[y][x] == 1 and random.random() < 0.06:
-                    self.grid[y][x] = 3
+        # Points d'eau décoratifs
+        placed_loot = set()
+        for rx, ry, rw, rh in rooms:
+            for _ in range(random.randint(0, 1)):
+                px = rx + random.randint(1, max(1, rw - 2))
+                py = ry + random.randint(1, max(1, rh - 2))
+                if self.grid[py][px] == 2 and (px, py) not in placed_loot:
+                    self.grid[py][px] = 3
+                    placed_loot.add((px, py))
 
-        # Crates near walls
-        for y in range(1, h - 1):
-            for x in range(max(1, x1 + 1), min(x2 - 1, w - 1)):
+        # Caisses pres des murs
+        for y in range(1, self.height - 1):
+            for x in range(max(1, x1 + 1), min(x2 - 1, self.width - 1)):
                 if self.grid[y][x] == 2 and random.random() < 0.04:
                     if any(self.grid[y + dy][x + dx] == 1 for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
                         self.grid[y][x] = 4
 
-        # Clear spawn zone
+        # Dégager la zone de spawn
+        cx, cy = (x1 + x2) // 2, self.height // 2
         for dy in range(-2, 3):
             for dx in range(-2, 3):
                 yy, xx = cy + dy, cx + dx
-                if x1 <= xx < x2 and 0 <= yy < h:
+                if x1 <= xx < x2 and 0 <= yy < self.height:
                     self.grid[yy][xx] = 2
+
+        # Dernier passage murs fins : combler les 0 adjacents au nouveau sol
+        for y in range(self.height):
+            for x in range(x1, x2):
+                if self.grid[y][x] != 0:
+                    continue
+                if any(
+                    0 <= ny < self.height and 0 <= nx < self.width
+                    and self.grid[ny][nx] == 2
+                    for ny in (y-1, y, y+1) for nx in (x-1, x, x+1)
+                    if (ny != y or nx != x)
+                ):
+                    self.grid[y][x] = 1
 
     def _enclose_with_walls(self, x1, x2):
         h, w = self.height, self.width
@@ -717,6 +780,19 @@ class Map:
                 new_grid[y][x] = tile_id
         self.grid = new_grid
 
+        # Normalise les 12 sous-types en 8 visuels : deviation → outer corner
+        dev_to_corner = {
+            WT["deviation_nw"]: WT["limite_NW"],
+            WT["deviation_ne"]: WT["limite_NE"],
+            WT["deviation_sw"]: WT["limite_SW"],
+            WT["deviation_se"]: WT["limite_SE"],
+        }
+        for y in range(self.height):
+            for x in range(self.width):
+                t = self.grid[y][x]
+                if t in dev_to_corner:
+                    self.grid[y][x] = dev_to_corner[t]
+
     def _gen_island(self, x1=0, x2=None):
         if x2 is None:
             x2 = self.width
@@ -769,6 +845,38 @@ class Map:
 
                 # --- Murs (sous-types 20..35 et mur generique 1) ---
                 if tile in self.WALL_TILE_IDS :
+                    # Sol sous le mur
+                    if tile_images:
+                        ground_tile_num = self.GROUND_TILE.get(biome, 1)
+                        if ground_tile_num in tile_images:
+                            gt_cfg = tile_images[ground_tile_num]
+                            if "variants" in gt_cfg:
+                                gx, gy = random.choice(gt_cfg["variants"])
+                            else:
+                                gx = gt_cfg.get("image_x", 0)
+                                gy = gt_cfg.get("image_y", 0)
+                            ground = Block(
+                                x * self.tile_size, y * self.tile_size,
+                                self.tile_size, self.tile_size,
+                                gt_cfg["bank"],
+                                image_x=gx, image_y=gy,
+                                color=gt_cfg.get("color"),
+                            )
+                            ground.blocking = False
+                            ground.indestructible = True
+                            self.world.add(ground)
+                        else:
+                            ground_color = fallback.get(ground_tile_num)
+                            if ground_color:
+                                ground = Block(
+                                    x * self.tile_size, y * self.tile_size,
+                                    self.tile_size, self.tile_size,
+                                    None, color=ground_color,
+                                )
+                                ground.blocking = False
+                                ground.indestructible = True
+                                self.world.add(ground)
+
                     wall_sprite = None
                     if tile_images:
                         ws = tile_images.get("wall_sprites") or {}
@@ -782,7 +890,7 @@ class Map:
                             bank, image_x=img_x, image_y=img_y,
                         )
                     else:
-                        color = fallback.get(1)
+                        color = fallback.get(tile) or fallback.get(1)
                         if not color:
                             continue
                         block = Block(
@@ -857,6 +965,8 @@ class Map:
                     block.blocking = False
                 if (biome == "dungeon" or biome == "cave") and tile == 1:
                     block.indestructible = True
+                if tile in (4, 5):
+                    block.pushable = True
                 self.world.add(block)
 
     def get_spawn_point(self):

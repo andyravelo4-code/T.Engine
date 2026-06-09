@@ -91,9 +91,14 @@ class Npc(Object):
         came_from[start] = None
         cost_so_far[start] = 0
 
-        # Build set of blocking grid positions
+        # Build set of blocking grid positions (via spatial hash)
         obstacles = set()
-        for obj in world.entities:
+        near = world.get_nearby(
+            (start_pos[0] + goal_pos[0]) / 2,
+            (start_pos[1] + goal_pos[1]) / 2,
+            int(math.hypot(start_pos[0] - goal_pos[0], start_pos[1] - goal_pos[1]) / 2 + 32)
+        )
+        for obj in near:
             if getattr(obj, "blocking", False) and obj != self and obj != self.target:
                 obstacles.add(self.get_grid_pos(obj.x, obj.y))
 
@@ -177,30 +182,34 @@ class Npc(Object):
         if self.current_item:
             self.current_item.draw()
 
-        # Draw punch arc
+        # Draw punch arc (cached PIL frames)
         if self.is_punching:
-            progress = 1.0 - (self.punch_timer / self.punch_duration)
-            alpha = int(255 * (1.0 - progress))
-            surf = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(surf)
-            center = (16, 16)
-            radius = 8 + progress * 3
-            points = []
-            for i in range(-80, 81, 8):
-                rad = math.radians(i) + self.punch_angle
-                px = center[0] + math.cos(rad) * radius
-                py = center[1] + math.sin(rad) * radius
-                points.append((px, py))
-            for i in range(80, -81, -8):
-                rad = math.radians(i) + self.punch_angle
-                thickness = 2.5 * math.cos(math.radians(i / 80 * 90))
-                r = radius - thickness
-                px = center[0] + math.cos(rad) * r
-                py = center[1] + math.sin(rad) * r
-                points.append((px, py))
-            if len(points) >= 3:
-                draw.polygon(points, fill=(255, 255, 255, alpha))
-            e.graphics.screen.blit(surf, (self.x + self.w/2 - 16 + e.graphics._camera_x, self.y + self.h/2 - 16 + e.graphics._camera_y))
+            if not hasattr(self, '_punch_cache') or getattr(self, '_punch_angle', None) != self.punch_angle:
+                self._punch_cache = {}
+                self._punch_angle = self.punch_angle
+                for t in range(self.punch_duration + 1):
+                    progress = 1.0 - t / self.punch_duration
+                    alpha = int(255 * (1.0 - progress))
+                    radius = 8 + progress * 3
+                    surf = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(surf)
+                    cx, cy = 16, 16
+                    pts = []
+                    for i in range(-80, 81, 8):
+                        rad = math.radians(i) + self.punch_angle
+                        pts.append((cx + math.cos(rad) * radius, cy + math.sin(rad) * radius))
+                    for i in range(80, -81, -8):
+                        rad = math.radians(i) + self.punch_angle
+                        t2 = 2.5 * math.cos(math.radians(i / 80 * 90))
+                        r = radius - t2
+                        pts.append((cx + math.cos(rad) * r, cy + math.sin(rad) * r))
+                    if len(pts) >= 3:
+                        draw.polygon(pts, fill=(255, 255, 255, alpha))
+                    self._punch_cache[t] = surf
+            e.graphics.screen.blit(self._punch_cache[self.punch_timer], (
+                self.x + self.w / 2 - 16 + e.graphics._camera_x,
+                self.y + self.h / 2 - 16 + e.graphics._camera_y,
+            ))
 
         # Draw health dot
         health_ratio = max(0, self.health / self.max_health)
@@ -241,7 +250,9 @@ class Npc(Object):
             self.attack_cooldown -= 1
 
         self.direction = "idle"
-        dist = math.hypot(self.target.x - self.x, self.target.y - self.y)
+        dx = self.target.x - self.x
+        dy = self.target.y - self.y
+        dist2 = dx * dx + dy * dy
 
         # Dynamic attack radius
         current_attack_radius = self.attack_radius
@@ -251,17 +262,18 @@ class Npc(Object):
             current_attack_radius = 60
 
         if self.aggressive:
-            self._update_aggressive(dist, current_attack_radius)
+            self._update_aggressive(dist2, current_attack_radius)
         else:
             self._update_passive()
 
         super().update()
 
-    def _update_aggressive(self, dist, current_attack_radius):
+    def _update_aggressive(self, dist2, current_attack_radius):
         world = self.world
+        ar2 = current_attack_radius * current_attack_radius
 
         if self._aggro:
-            if dist < current_attack_radius:
+            if dist2 < ar2:
                 self.state = "attack"
                 self._face_target()
                 if self.attack_cooldown <= 0:
@@ -293,7 +305,7 @@ class Npc(Object):
                 self._update_punch()
             return
 
-        if dist < current_attack_radius:
+        if dist2 < ar2:
             self.state = "attack"
             self._face_target()
             if self.attack_cooldown <= 0:
@@ -321,7 +333,7 @@ class Npc(Object):
 
         if self.is_punching:
             self._update_punch()
-        elif dist < self.detection_radius:
+        elif dist2 < self.detection_radius * self.detection_radius:
             self.state = "chase"
             self._follow_path(self.target.x, self.target.y)
         else:
@@ -342,17 +354,20 @@ class Npc(Object):
 
         # Flee from aggressive NPCs (priority)
         nearest_threat = None
-        nearest_threat_dist = float("inf")
-        for entity in world.entities:
+        nearest_threat_dist2 = float("inf")
+        dr2 = self.detection_radius * self.detection_radius
+        for entity in world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, self.detection_radius):
             if entity is self:
                 continue
             if getattr(entity, "aggressive", False) and entity is not self.target:
-                d = math.hypot(entity.x - self.x, entity.y - self.y)
-                if d < nearest_threat_dist:
-                    nearest_threat_dist = d
+                dx = entity.x - self.x
+                dy = entity.y - self.y
+                d2 = dx * dx + dy * dy
+                if d2 < nearest_threat_dist2:
+                    nearest_threat_dist2 = d2
                     nearest_threat = entity
 
-        if nearest_threat and nearest_threat_dist < self.detection_radius:
+        if nearest_threat and nearest_threat_dist2 < dr2:
             self.state = "flee"
             self._target_x = self.x - (nearest_threat.x - self.x) * 3
             self._target_y = self.y - (nearest_threat.y - self.y) * 3
@@ -396,13 +411,16 @@ class Npc(Object):
                 self._behavior_timer = 0
         elif self.state in ("flee", "walk"):
             self._move_smoothly(self._target_x, self._target_y)
-            if math.hypot(self._target_x - self.x, self._target_y - self.y) < 8:
+            dx = self._target_x - self.x
+            dy = self._target_y - self.y
+            if dx * dx + dy * dy < 64:
                 self._behavior_timer = 0
 
     def _follow_path(self, target_x, target_y):
         world = self.world
-        dist = math.hypot(target_x - self.x, target_y - self.y)
-        if dist < 8:
+        dx = target_x - self.x
+        dy = target_y - self.y
+        if dx * dx + dy * dy < 64:
             self.path = []
             return
 
@@ -424,13 +442,14 @@ class Npc(Object):
             ny = next_node[1] * 8
             dx = nx - self.x
             dy = ny - self.y
-            nd = math.hypot(dx, dy)
+            nd2 = dx * dx + dy * dy
             map_w, map_h = self._map_bounds(world)
-            if nd <= self.speed or nd < 0.01:
+            if nd2 <= self.speed * self.speed or nd2 < 0.0001:
                 self.x = max(0, min(nx, map_w - self.w))
                 self.y = max(0, min(ny, map_h - self.h))
                 self.path.pop(0)
             else:
+                nd = math.sqrt(nd2)
                 self.x = max(0, min(self.x + (dx / nd) * self.speed, map_w - self.w))
                 self.y = max(0, min(self.y + (dy / nd) * self.speed, map_h - self.h))
                 if abs(dx) > abs(dy):
@@ -457,19 +476,19 @@ class Npc(Object):
 
         dx = target_x - self.x
         dy = target_y - self.y
-        dist = math.hypot(dx, dy)
+        dist2 = dx * dx + dy * dy
 
-        if dist < 4:
+        if dist2 < 16:
             self.velocity_x *= 0.5
             self.velocity_y *= 0.5
-            if dist < 1:
+            if dist2 < 1:
                 self.velocity_x = 0
                 self.velocity_y = 0
                 self.state = "idle"
                 return
 
         # Accelerate toward target (4-directional)
-        if dist > 0:
+        if dist2 > 0:
             if abs(dx) > abs(dy):
                 self.velocity_x += (1 if dx > 0 else -1) * self.acceleration
                 self.velocity_y *= 0.9
@@ -478,7 +497,7 @@ class Npc(Object):
                 self.velocity_x *= 0.9
 
         # Entity avoidance — repulsion from nearby blocking entities
-        for entity in world.entities:
+        for entity in world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 16):
             if entity is self or entity is self.target:
                 continue
             if not getattr(entity, "blocking", False) and not isinstance(entity, Npc):
@@ -489,8 +508,9 @@ class Npc(Object):
             sy = self.y + self.h / 2
             edx = sx - ex
             edy = sy - ey
-            edist = math.hypot(edx, edy)
-            if 0 < edist < 12:
+            ed2 = edx * edx + edy * edy
+            if 0 < ed2 < 144:
+                edist = math.sqrt(ed2)
                 force = (12 - edist) / 12 * 0.3
                 self.velocity_x += (edx / edist) * force
                 self.velocity_y += (edy / edist) * force
@@ -500,9 +520,10 @@ class Npc(Object):
         self.velocity_y *= self.friction
 
         # Clamp speed
-        speed = math.hypot(self.velocity_x, self.velocity_y)
-        if speed > self.max_speed:
-            ratio = self.max_speed / speed
+        speed2 = self.velocity_x * self.velocity_x + self.velocity_y * self.velocity_y
+        max_s2 = self.max_speed * self.max_speed
+        if speed2 > max_s2:
+            ratio = self.max_speed / math.sqrt(speed2)
             self.velocity_x *= ratio
             self.velocity_y *= ratio
 
@@ -574,8 +595,8 @@ class Npc(Object):
             if 0 <= gy < map_entity.height and 0 <= gx < map_entity.width:
                 if not map_entity._is_walkable(map_entity.grid[gy][gx], gx, gy):
                     return True
-        # Check blocking entities
-        for entity in world.entities:
+        # Check blocking entities (via spatial hash)
+        for entity in world.get_nearby(x + self.w / 2, y + self.h / 2, 12):
             if entity is self:
                 continue
             if getattr(entity, "blocking", False):
@@ -586,13 +607,14 @@ class Npc(Object):
 
     def _update_punch(self):
         self.punch_timer -= 1
-        for entity in self.world.entities:
+        for entity in self.world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 24):
             if entity is self or not hasattr(entity, 'take_damage'):
                 continue
             if not entity.is_living and not getattr(entity, 'blocking', False):
                 continue
-            p_dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
-            if p_dist < 18 and entity not in self.hit_entities:
+            dx = entity.x + entity.w/2 - self.x
+            dy = entity.y + entity.h/2 - self.y
+            if dx * dx + dy * dy < 324 and entity not in self.hit_entities:
                 angle_to_entity = math.atan2(entity.y + entity.h/2 - (self.y + self.h/2), entity.x + entity.w/2 - (self.x + self.w/2))
                 angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
                 if abs(angle_diff) < math.radians(90):

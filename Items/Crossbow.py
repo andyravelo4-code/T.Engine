@@ -63,8 +63,8 @@ class Crossbow(Item):
         self.rotation = math.degrees(mouse_angle) + 90
 
         # Positionnement autour du parent
-        self.x = self.parent.x + self.radius * math.cos(mouse_angle)
-        self.y = self.parent.y + self.radius * math.sin(mouse_angle)
+        self.x = int(self.parent.x + self.radius * math.cos(mouse_angle))
+        self.y = int(self.parent.y + self.radius * math.sin(mouse_angle))
 
     def draw(self):
         if not self.picked_up:

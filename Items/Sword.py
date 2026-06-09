@@ -75,13 +75,14 @@ class Sword(Item):
             self.rotation = math.degrees(self.pos_angle)
 
             if self.world:
-                for entity in self.world.entities:
+                for entity in self.world.get_nearby(self.x, self.y, 16):
                     if entity is self or entity is self.parent or not hasattr(entity, 'take_damage'):
                         continue
                     if not entity.is_living and not getattr(entity, 'blocking', False):
                         continue
-                    dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
-                    if dist < 12 and entity not in self.hit_entities:
+                    dx = entity.x + entity.w/2 - self.x
+                    dy = entity.y + entity.h/2 - self.y
+                    if dx * dx + dy * dy < 144 and entity not in self.hit_entities:
                             self.hit_entities.append(entity)
                             entity.take_damage(self.damage, self.world)
                             if hasattr(e, 'active_camera'):
@@ -105,7 +106,7 @@ class Sword(Item):
             # La rotation suit l'angle de position
             self.rotation = math.degrees(self.pos_angle)
 
-        self.x = self.parent.x + self.radius *  math.cos(self.pos_angle)
+        self.x = self.parent.x + self.radius * math.cos(self.pos_angle)
         self.y = self.parent.y + self.radius * math.sin(self.pos_angle)
 
     def draw(self):
@@ -116,37 +117,33 @@ class Sword(Item):
         elif self.parent and self.parent.current_item == self:
             # Draw slash arc
             if self.is_slashing:
-                progress = 1.0 - (self.slash_timer / self.slash_duration)
-                alpha = int(255 * (1 - progress))
-                surf = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
-                draw = ImageDraw.Draw(surf)
-                
-                center = (32, 32)
-                radius = 11+ progress * 5
-                
-                current_angle = self.start_slash_angle + (math.pi * 1.0 * progress * self.p)
-                points = []
-                
-                # Outer arc
-                for i in range(-70, 71, 10):
-                    rad = math.radians(i) + current_angle
-                    px = center[0] + math.cos(rad) * radius
-                    py = center[1] + math.sin(rad) * radius
-                    points.append((px, py))
-                
-                # Inner arc
-                for i in range(70, -71, -10):
-                    rad = math.radians(i) + current_angle
-                    thickness = 3 * math.cos(math.radians(i / 70 * 90))
-                    r = radius - thickness
-                    px = center[0] + math.cos(rad) * r
-                    py = center[1] + math.sin(rad) * r
-                    points.append((px, py))
-                
-                if len(points) >= 3:
-                    draw.polygon(points, fill=(152, 159, 126, (alpha)%255))
-                
-                e.graphics.screen.blit(surf, (self.parent.x + self.parent.w/2 - 32 + e.graphics._camera_x, self.parent.y + self.parent.h/2 - 32 + e.graphics._camera_y))
+                if not hasattr(self, '_slash_cache') or self._slash_key != (self.start_slash_angle, self.p):
+                    self._slash_cache = {}
+                    self._slash_key = (self.start_slash_angle, self.p)
+                    for t in range(self.slash_duration + 1):
+                        progress = 1.0 - t / self.slash_duration
+                        alpha = int(255 * (1 - progress))
+                        radius = 11 + progress * 5
+                        cur_angle = self.start_slash_angle + (math.pi * 1.0 * progress * self.p)
+                        surf = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+                        draw = ImageDraw.Draw(surf)
+                        cx, cy = 32, 32
+                        pts = []
+                        for i in range(-70, 71, 10):
+                            rad = math.radians(i) + cur_angle
+                            pts.append((cx + math.cos(rad) * radius, cy + math.sin(rad) * radius))
+                        for i in range(70, -71, -10):
+                            rad = math.radians(i) + cur_angle
+                            t2 = 3 * math.cos(math.radians(i / 70 * 90))
+                            r = radius - t2
+                            pts.append((cx + math.cos(rad) * r, cy + math.sin(rad) * r))
+                        if len(pts) >= 3:
+                            draw.polygon(pts, fill=(152, 159, 126, alpha))
+                        self._slash_cache[t] = surf
+                e.graphics.screen.blit(self._slash_cache[self.slash_timer], (
+                    self.parent.x + self.parent.w / 2 - 32 + e.graphics._camera_x,
+                    self.parent.y + self.parent.h / 2 - 32 + e.graphics._camera_y,
+                ))
 
             # Récupération de la portion de l'image
             sub = self.bank.subsurface(self.w * self.held_pos[0], self.h * self.held_pos[1], self.w, self.h)

@@ -1,5 +1,4 @@
 import sys
-from PIL import Image, ImageDraw
 from Engine import engine as e
 from Entities.Player import Player
 from Entities.World import World
@@ -18,9 +17,11 @@ e.init(200, 200, title="Game", fps=60, display_scale=5, pixel_art=True)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
 e.resources.image(2, "./assests/images/caves.png")
+e.resources.image(3, "./assests/images/Tileset_Wall_Stone_8x8.png")
 sheet1 = e.resources.images[0]
 stuff = e.resources.images[1]
 rev= e.resources.images[2]
+walls_ts = e.resources.images[3]
 world = World()
 
 player = Player(10, 10, 8, 8, sheet1, world=world)
@@ -55,7 +56,7 @@ game_map = Map(world)
 world.map = game_map
 if MAP_MODE == "single":
     game_map.generate(
-        MAP_BIOME, 25, 25,
+        MAP_BIOME, 50, 40,
         npc_count=2, player=player,
         npc_configs=[
             {"frames_dict": frames_dict, "max_health": 80, "speed": 0.6, "punch_damage": 4, "punch_cooldown": 40},
@@ -68,8 +69,14 @@ if MAP_MODE == "single":
             {"cls": Chest, "bank": stuff, "image_x": 0, "image_y": 5, "placed_pos": (7, 10), "count": 1,}
         ],
         tile_images={
+            "wall_sprites": {
+                "bank": walls_ts,
+                20: (1, 0), 21: (1, 2),
+                22: (2, 1), 23: (0, 1),
+                24: (0, 0), 25: (2, 0),
+                26: (0, 2), 27: (2, 2),
+            },
             4 : {"bank":stuff,"image_x":1,"image_y":5},
-           # 1 : {"bank":rev, "variants":list((i,0) for i in range(3,6))}
         },
         tile_whitelist=(1,2,3,5,4)
     )
@@ -155,8 +162,8 @@ def draw():
     world.draw()
 
     if cam.flash_alpha > 0:
-        surf = Image.new('RGBA', (e.width(), e.height()), (*cam.flash_color, cam.flash_alpha))
-        e.graphics.screen.blit(surf, (0, 0))
+        e.graphics.screen.fill_rect(0, 0, e.width(), e.height(),
+            (*cam.flash_color, cam.flash_alpha))
 
     e.camera()
 

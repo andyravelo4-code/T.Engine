@@ -27,7 +27,7 @@ class Arrow(Object):
         self.y += math.sin(self.angle + self.offset) * self.speed
 
         if self.world:
-            for entity in self.world.entities:
+            for entity in self.world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 12):
                 if entity is self or entity is self.shooter or isinstance(entity, Arrow):
                     continue
                 if not hasattr(entity, 'take_damage'):
@@ -35,8 +35,9 @@ class Arrow(Object):
                 if not entity.is_living and not getattr(entity, 'blocking', False):
                     continue
 
-                dist = math.hypot(entity.x + entity.w/2 - self.x, entity.y + entity.h/2 - self.y)
-                if dist < 8:
+                dx = entity.x + entity.w/2 - self.x
+                dy = entity.y + entity.h/2 - self.y
+                if dx * dx + dy * dy < 64:
                     entity.take_damage(self.damage, self.world)
                     if hasattr(e, 'active_camera'):
                         e.active_camera.shake(3, 2)
