@@ -35,6 +35,6 @@ class Item(Object):
 
     def draw(self):
         if not self.picked_up:
-            self.draw_image(0, 0, rotate=30)
+            self.draw_image(0, 0)
         elif self.parent and self.parent.current_item == self:
             pass

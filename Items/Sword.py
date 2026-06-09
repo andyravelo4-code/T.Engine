@@ -105,13 +105,13 @@ class Sword(Item):
             # La rotation suit l'angle de position
             self.rotation = math.degrees(self.pos_angle)
 
-        self.x = self.parent.x + self.radius * math.cos(self.pos_angle)
+        self.x = self.parent.x + self.radius *  math.cos(self.pos_angle)
         self.y = self.parent.y + self.radius * math.sin(self.pos_angle)
 
     def draw(self):
         if not self.picked_up:
             self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(2, 2))
-            self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=30)
+            self.draw_image(self.dropped_pos[0], self.dropped_pos[1])
 
         elif self.parent and self.parent.current_item == self:
             # Draw slash arc
@@ -122,7 +122,7 @@ class Sword(Item):
                 draw = ImageDraw.Draw(surf)
                 
                 center = (32, 32)
-                radius = 10+ progress * 5
+                radius = 11+ progress * 5
                 
                 current_angle = self.start_slash_angle + (math.pi * 1.0 * progress * self.p)
                 points = []
@@ -144,7 +144,7 @@ class Sword(Item):
                     points.append((px, py))
                 
                 if len(points) >= 3:
-                    draw.polygon(points, fill=(255, 255, 255, (alpha)%255))
+                    draw.polygon(points, fill=(152, 159, 126, (alpha)%255))
                 
                 e.graphics.screen.blit(surf, (self.parent.x + self.parent.w/2 - 32 + e.graphics._camera_x, self.parent.y + self.parent.h/2 - 32 + e.graphics._camera_y))
 
@@ -158,7 +158,7 @@ class Sword(Item):
 
             # L'angle de dessin doit toujours pointer vers l'extérieur (rotation = pos_angle)
             # Pas besoin de 180° supplémentaire quand flipped car le flip s'occupe déjà de l'effet miroir
-            e.blt(self.x, self.y, sub, 0, 0, self.w, self.h, rotate=-self.rotation + 90)
+            e.blt(round(self.x), round(self.y), sub, 0, 0, self.w, self.h, rotate=-self.rotation + 90)
 
     def slash(self):
         self.is_slashing = True

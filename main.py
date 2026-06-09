@@ -10,15 +10,17 @@ from Items.Crossbow import Crossbow
 from Items.Consumable import Consumable
 from Entities.Chest import Chest
 
-MAP_MODE = "island"
+MAP_MODE = "single"
 MAP_BIOME = "dungeon"
 MAP_BIOMES = [ "desert"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
 
 e.init(200, 200, title="Game", fps=60, display_scale=5, pixel_art=True)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
+e.resources.image(2, "./assests/images/revolution_tiles.png")
 sheet1 = e.resources.images[0]
 stuff = e.resources.images[1]
+rev= e.resources.images[2]
 world = World()
 
 player = Player(10, 10, 8, 8, sheet1, world=world)
@@ -91,7 +93,8 @@ elif MAP_MODE == "island":
              ]},
         ],
         tile_images={
-            4:{"bank":stuff,"image_x":2,"image_y":5}
+            4:{"bank":stuff,"image_x":2,"image_y":5},
+            #5:{"bank":rev , "variants":[(6,1),(3,1)]}
         }
     )
 elif MAP_MODE == "surface":
@@ -124,7 +127,7 @@ elif MAP_MODE == "multi":
     )
 bg_color = game_map.bg_color
 
-cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.2, mouse_limit=10)
+cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.5, mouse_limit=15)
 e.active_camera = cam
 inventory = Inventory(player)
 
@@ -161,7 +164,7 @@ def draw():
     if inventory.drag_item and inventory.drag_qty > 0:
         pass
     else:
-        e.circb(e.mouse_x(), e.mouse_y(), 4, (255, 255, 255, 50))
+        e.circb(e.mouse_x(), e.mouse_y(), 4, (255, 255, 255, 150))
 
 
 if __name__ == "__main__":

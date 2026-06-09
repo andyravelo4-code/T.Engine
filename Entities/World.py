@@ -2,7 +2,8 @@ import math
 import Engine.engine
 from Engine import engine
 from Entities.Block import Block
-
+from Entities.Player import Player
+import math
 
 class FloatingText:
     def __init__(self, x, y, text, color, lifetime):
@@ -24,6 +25,7 @@ class World:
         self.entities = []
         self.active_npc = None
         self.floating_texts = []
+        self.player = None
 
     def add_floating_text(self, x, y, text, color, lifetime):
         self.floating_texts.append(FloatingText(x, y, text, color, lifetime))
@@ -64,6 +66,11 @@ class World:
 
     def update(self):
         """Met à jour toutes les entités et supprime celles qui ont expiré."""
+        if not self.player :
+            for e in self.entities :
+                if isinstance(e, Player):
+                    self.player = e 
+                    break
         self.update_active_npc()
         for entity in list(self.entities):
             entity.update()
@@ -87,13 +94,15 @@ class World:
         for e in blocks:
             sx = e.x + cam_x
             sy = e.y + cam_y
-            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh:
+            dist = math.dist((-cam_x+engine.width()/2,-cam_y+engine.height()/2),(e.x,e.y))
+            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh and dist < 70:
                 e.draw()
 
         others = [e for e in self.entities if not isinstance(e, Block)]
         for e in sorted(others, key=lambda e: e.y):
-            e.draw()
-
+            dist = math.dist((-cam_x+engine.width()/2,-cam_y+engine.height()/2),(e.x,e.y))
+            if dist < 70:
+                e.draw()
         for ft in self.floating_texts:
             font = engine.default_font(6)
             surf = font.render(ft.text, False, ft.color[:3])

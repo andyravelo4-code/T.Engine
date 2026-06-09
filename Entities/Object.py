@@ -65,8 +65,8 @@ class Object:
 
     def draw_image(self, index_x, index_y, rotate=0, offset=(0, 0)):
         e.blt(
-            self.x + offset[0],
-            self.y + offset[1],
+            int(self.x + offset[0]),
+            int(self.y + offset[1]),
             self.bank,
             self.w * index_x,
             self.h * index_y,
