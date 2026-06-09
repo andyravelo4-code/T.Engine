@@ -12,12 +12,12 @@ from Entities.Chest import Chest
 
 MAP_MODE = "single"
 MAP_BIOME = "dungeon"
-MAP_BIOMES = [ "desert"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
+MAP_BIOMES = [ "desert","hills"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
 
 e.init(200, 200, title="Game", fps=60, display_scale=5, pixel_art=True)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
-e.resources.image(2, "./assests/images/revolution_tiles.png")
+e.resources.image(2, "./assests/images/caves.png")
 sheet1 = e.resources.images[0]
 stuff = e.resources.images[1]
 rev= e.resources.images[2]
@@ -55,7 +55,7 @@ game_map = Map(world)
 world.map = game_map
 if MAP_MODE == "single":
     game_map.generate(
-        MAP_BIOME, 20, 20,
+        MAP_BIOME, 25, 25,
         npc_count=2, player=player,
         npc_configs=[
             {"frames_dict": frames_dict, "max_health": 80, "speed": 0.6, "punch_damage": 4, "punch_cooldown": 40},
@@ -68,7 +68,8 @@ if MAP_MODE == "single":
             {"cls": Chest, "bank": stuff, "image_x": 0, "image_y": 5, "placed_pos": (7, 10), "count": 1,}
         ],
         tile_images={
-            4 : {"bank":stuff,"image_x":1,"image_y":5}
+            4 : {"bank":stuff,"image_x":1,"image_y":5},
+           # 1 : {"bank":rev, "variants":list((i,0) for i in range(3,6))}
         },
         tile_whitelist=(1,2,3,5,4)
     )
@@ -127,7 +128,7 @@ elif MAP_MODE == "multi":
     )
 bg_color = game_map.bg_color
 
-cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.5, mouse_limit=15)
+cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.2, mouse_limit=10)
 e.active_camera = cam
 inventory = Inventory(player)
 

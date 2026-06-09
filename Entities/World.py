@@ -95,13 +95,15 @@ class World:
             sx = e.x + cam_x
             sy = e.y + cam_y
             dist = math.dist((-cam_x+engine.width()/2,-cam_y+engine.height()/2),(e.x,e.y))
-            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh and dist < 70:
+            #dist1 = math.dist((engine.mouse_x()-cam_x,engine.mouse_y()-cam_y),(e.x,e.y))
+            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh and( dist < 60) :#or sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh and dist < 30 :
                 e.draw()
 
         others = [e for e in self.entities if not isinstance(e, Block)]
         for e in sorted(others, key=lambda e: e.y):
             dist = math.dist((-cam_x+engine.width()/2,-cam_y+engine.height()/2),(e.x,e.y))
-            if dist < 70:
+            #dist1 = math.dist((engine.mouse_x()-cam_x,engine.mouse_y()-cam_y),(e.x,e.y))
+            if  dist < 60:
                 e.draw()
         for ft in self.floating_texts:
             font = engine.default_font(6)

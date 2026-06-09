@@ -768,7 +768,7 @@ class Map:
                 walkable = self.NON_BLOCKING_TILES.get(biome, set())
 
                 # --- Murs (sous-types 20..35 et mur generique 1) ---
-                if tile in self.WALL_TILE_IDS or tile == 1:
+                if tile in self.WALL_TILE_IDS :
                     wall_sprite = None
                     if tile_images:
                         ws = tile_images.get("wall_sprites") or {}

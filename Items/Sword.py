@@ -110,7 +110,7 @@ class Sword(Item):
 
     def draw(self):
         if not self.picked_up:
-            self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(2, 2))
+            self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(0, 1))
             self.draw_image(self.dropped_pos[0], self.dropped_pos[1])
 
         elif self.parent and self.parent.current_item == self:
