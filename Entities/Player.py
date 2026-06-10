@@ -225,45 +225,50 @@ class Player(Object):
         self._rem_x -= dx
         self._rem_y -= dy
 
-        # Collecter les entités bloquantes une seule fois (via spatial hash)
+        # Collecter les entités bloquantes (via spatial hash)
         near = world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 20) if world else []
         blocking = [
             obj for obj in near
             if getattr(obj, "blocking", False) and obj != self and not isinstance(obj, Npc)
         ]
 
-        # Axe X : pixel par pixel pour un glissement fluide
+        def _try_push_smooth(obj, speed, depth=0):
+            if depth > 4:
+                return False
+            old_x, old_y = obj.x, obj.y
+            dir = obj.push_back(self.x, self.y, self.w, self.h, speed)
+            if dir == 'none':
+                return False
+            for other in blocking:
+                if other is obj:
+                    continue
+                if obj.is_collid(other):
+                    if getattr(other, "pushable", False) and _try_push_smooth(other, speed, depth + 1):
+                        continue
+                    obj.x, obj.y = old_x, old_y
+                    return False
+            return True
+
+        # Mouvement avec push fluide
+        push_speed = max(abs(dx), abs(dy), 2)
         if dx != 0:
-            step_x = 1 if dx > 0 else -1
-            for _ in range(abs(dx)):
-                self.x += step_x
-                blocked = False
-                for obj in blocking:
-                    if self.is_collid(obj):
-                        if getattr(obj, "pushable", False) and self._try_push(obj, step_x, 0, blocking):
-                            continue
-                        self.x -= step_x
-                        self.velocity_x = 0
-                        blocked = True
-                        break
-                if blocked:
+            self.x += dx
+            for obj in blocking:
+                if self.is_collid(obj):
+                    if getattr(obj, "pushable", False) and _try_push_smooth(obj, push_speed):
+                        continue
+                    self.x -= dx
+                    self.velocity_x = 0
                     break
 
-        # Axe Y : pixel par pixel
         if dy != 0:
-            step_y = 1 if dy > 0 else -1
-            for _ in range(abs(dy)):
-                self.y += step_y
-                blocked = False
-                for obj in blocking:
-                    if self.is_collid(obj):
-                        if getattr(obj, "pushable", False) and self._try_push(obj, 0, step_y, blocking):
-                            continue
-                        self.y -= step_y
-                        self.velocity_y = 0
-                        blocked = True
-                        break
-                if blocked:
+            self.y += dy
+            for obj in blocking:
+                if self.is_collid(obj):
+                    if getattr(obj, "pushable", False) and _try_push_smooth(obj, push_speed):
+                        continue
+                    self.y -= dy
+                    self.velocity_y = 0
                     break
 
         if in_attack:
@@ -401,19 +406,3 @@ class Player(Object):
         if self.equipment[0] is not None and self.equipment[1] is not None:
             self.equipment[0], self.equipment[1] = self.equipment[1], self.equipment[0]
             self._sync_current_item()
-
-    def _try_push(self, obj, dx, dy, blocking_list, depth=0):
-        if depth > 4:
-            return False
-        old_x, old_y = obj.x, obj.y
-        obj.x += dx
-        obj.y += dy
-        for other in blocking_list:
-            if other is obj:
-                continue
-            if obj.is_collid(other):
-                if getattr(other, "pushable", False) and self._try_push(other, dx, dy, blocking_list, depth + 1):
-                    continue
-                obj.x, obj.y = old_x, old_y
-                return False
-        return True

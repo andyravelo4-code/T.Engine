@@ -145,10 +145,20 @@ class World:
         cx = -cam_x + sw / 2
         cy = -cam_y + sh / 2
 
-        near = self.spatial.get_near(cx, cy, 60)
-        d2max = 3600
+        near = self.spatial.get_near(cx, cy, 70)
+        d2max = 4600
 
-        fixed_blocks = [e for e in near if isinstance(e, Block) and not getattr(e, 'pushable', False)]
+        floor_blocks = [e for e in near if isinstance(e, Block) and getattr(e, 'is_floor', False)]
+        for e in floor_blocks:
+            sx = e.x + cam_x
+            sy = e.y + cam_y
+            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh:
+                dx = e.x + e.w / 2 - cx
+                dy = e.y + e.h / 2 - cy
+                if dx * dx + dy * dy < d2max:
+                    e.draw()
+
+        fixed_blocks = [e for e in near if isinstance(e, Block) and not getattr(e, 'pushable', False) and not getattr(e, 'is_floor', False)]
         for e in sorted(fixed_blocks, key=lambda e: e.y):
             sx = e.x + cam_x
             sy = e.y + cam_y

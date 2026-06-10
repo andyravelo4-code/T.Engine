@@ -51,24 +51,24 @@ class Map:
                     20: (85, 80, 75), 21: (85, 80, 75), 22: (75, 70, 65), 23: (75, 70, 65),
                     24: (120, 105, 90), 25: (120, 105, 90), 26: (120, 105, 90), 27: (120, 105, 90)},
         "island":  {2: (10, 55, 85), 3: (181, 174, 145), 4: (70, 65, 60)},
-        "plains":  {2: (10, 55, 85), 3: (60, 130, 60), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30)},
-        "hills":   {2: (10, 55, 85), 3: (55, 120, 55), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30)},
-        "rocky_plains": {2: (10, 55, 85), 1: (100, 100, 100), 4: (120, 115, 110), 5: (200, 180, 120)},
-        "forest":  {2: (10, 55, 85), 3: (40, 100, 40), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30)},
-        "desert":  {2: (10, 55, 85), 5: (200, 180, 120), 4: (160, 140, 100)},
-        "mountains": {2: (10, 55, 85), 1: (140, 140, 150), 4: (120, 115, 110), 5: (200, 180, 120)},
+        "plains":  {2: (10, 55, 85), 3: (60, 130, 60), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60)},
+        "hills":   {2: (10, 55, 85), 3: (55, 120, 55), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60)},
+        "rocky_plains": {2: (10, 55, 85), 1: (100, 100, 100), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60)},
+        "forest":  {2: (10, 55, 85), 3: (40, 100, 40), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60)},
+        "desert":  {2: (10, 55, 85), 5: (200, 180, 120), 4: (160, 140, 100), 10: (220, 200, 80), 11: (80, 120, 60), 12: (200, 120, 160), 13: (70, 140, 60)},
+        "mountains": {2: (10, 55, 85), 1: (140, 140, 150), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60)},
     }
 
     NON_BLOCKING_TILES = {
         "cave": {3},
         "dungeon": {2},
         "island": {2, 3, 4},
-        "plains": {3, 5, 6},
-        "hills": {3, 5, 6,4},
-        "rocky_plains": {1, 5},
-        "forest": {3, 5, 6},
-        "desert": {5,2,4},
-        "mountains": {5},
+        "plains": {3, 5, 6, 10, 11, 12, 13},
+        "hills": {3, 5, 6, 4, 10, 11, 12, 13},
+        "rocky_plains": {1, 5, 10, 11, 12, 13},
+        "forest": {3, 5, 6, 10, 11, 12, 13},
+        "desert": {5, 2, 4, 10, 11, 12, 13},
+        "mountains": {5, 10, 11, 12, 13},
     }
 
     # Tuiles considerees comme "interieur d'une salle" (sol + decoration).
@@ -103,6 +103,7 @@ class Map:
             "surface": 3,
             "decoration": None,
             "decoration_chance": 0.02,
+            "decoration_variants": [(10, 3), (11, 2), (13, 1)],
             "base_height": 0.38,
             "height_amp": 0.18,
         },
@@ -110,6 +111,7 @@ class Map:
             "surface": 3,
             "decoration": 4,
             "decoration_chance": 0.04,
+            "decoration_variants": [(10, 2), (11, 3), (13, 1)],
             "base_height": 0.50,
             "height_amp": 0.28,
         },
@@ -117,6 +119,7 @@ class Map:
             "surface": 1,
             "decoration": 4,
             "decoration_chance": 0.08,
+            "decoration_variants": [(11, 2), (12, 1)],
             "base_height": 0.45,
             "height_amp": 0.18,
         },
@@ -124,6 +127,7 @@ class Map:
             "surface": 3,
             "decoration": 7,
             "decoration_chance": 0.14,
+            "decoration_variants": [(10, 3), (11, 4), (12, 1), (13, 2)],
             "base_height": 0.42,
             "height_amp": 0.22,
         },
@@ -131,6 +135,7 @@ class Map:
             "surface": 5,
             "decoration": 4,
             "decoration_chance": 0.02,
+            "decoration_variants": [(10, 1), (13, 2)],
             "base_height": 0.35,
             "height_amp": 0.10,
         },
@@ -138,6 +143,7 @@ class Map:
             "surface": 1,
             "decoration": None,
             "decoration_chance": 0.03,
+            "decoration_variants": [(11, 2), (12, 1)],
             "base_height": 0.65,
             "height_amp": 0.35,
         },
@@ -316,10 +322,16 @@ class Map:
                     continue
                 biome = self.biome_grid[y][x]
                 cfg = self.BIOME_CONFIG.get(biome, {})
-                deco = cfg.get("decoration")
                 chance = cfg.get("decoration_chance", 0)
-                if deco and random.random() < chance and self.grid[y][x] == cfg.get("surface", 3):
-                    self.grid[y][x] = deco
+                if self.grid[y][x] == cfg.get("surface", 3) and random.random() < chance:
+                    variants = cfg.get("decoration_variants")
+                    if variants:
+                        tiles, weights = zip(*variants)
+                        self.grid[y][x] = random.choices(tiles, weights=weights, k=1)[0]
+                    else:
+                        deco = cfg.get("decoration")
+                        if deco:
+                            self.grid[y][x] = deco
 
         for y in range(1, map_height - 1):
             for x in range(1, map_width - 1):
@@ -402,10 +414,16 @@ class Map:
                     continue
                 biome = self.biome_grid[y][x]
                 cfg = self.BIOME_CONFIG.get(biome, {})
-                deco = cfg.get("decoration")
                 chance = cfg.get("decoration_chance", 0)
-                if deco and random.random() < chance and self.grid[y][x] == cfg.get("surface", 3):
-                    self.grid[y][x] = deco
+                if self.grid[y][x] == cfg.get("surface", 3) and random.random() < chance:
+                    variants = cfg.get("decoration_variants")
+                    if variants:
+                        tiles, weights = zip(*variants)
+                        self.grid[y][x] = random.choices(tiles, weights=weights, k=1)[0]
+                    else:
+                        deco = cfg.get("decoration")
+                        if deco:
+                            self.grid[y][x] = deco
 
         for y in range(1, map_height - 1):
             for x in range(1, map_width - 1):
@@ -608,10 +626,10 @@ class Map:
                         self.grid[y][bx] = 2
 
         # Murs de bordure
-        for y in range(self.height):
-            for x in range(x1, x2):
-                if y == 0 or y == self.height - 1 or x == x1 or x == x2 - 1:
-                    self.grid[y][x] = 1
+        #for y in range(self.height):
+        #    for x in range(x1, x2):
+        #       if y == 0 or y == self.height - 1 or x == x1 or x == x2 - 1:
+        #           self.grid[y][x] = 0
 
         # Murs fins : tout 0 adjacent à du sol (2) → 1
         for y in range(self.height):
@@ -923,6 +941,7 @@ class Map:
                             )
                             ground.blocking = False
                             ground.indestructible = True
+                            ground.is_floor = True
                             self.world.add(ground)
                         else:
                             ground_color = fallback.get(ground_tile_num)
@@ -934,6 +953,7 @@ class Map:
                                 )
                                 ground.blocking = False
                                 ground.indestructible = True
+                                ground.is_floor = True
                                 self.world.add(ground)
 
                 if tile_images and tile in tile_images:
@@ -963,9 +983,11 @@ class Map:
 
                 if tile in walkable:
                     block.blocking = False
+                    if tile not in (4,):
+                        block.is_floor = True
                 if (biome == "dungeon" or biome == "cave") and tile == 1:
                     block.indestructible = True
-                if tile in (4, 5):
+                if tile in (4,):
                     block.pushable = True
                 self.world.add(block)
 

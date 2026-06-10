@@ -11,9 +11,9 @@ from Entities.Chest import Chest
 
 MAP_MODE = "single"
 MAP_BIOME = "dungeon"
-MAP_BIOMES = [ "desert","hills"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
+MAP_BIOMES = [ "desert","forest"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
 
-e.init(200, 200, title="Game", fps=60, display_scale=5, pixel_art=True)
+e.init(300, 200, title="Game", fps=60, display_scale=4, pixel_art=True)
 e.resources.image(0, "./assests/images/feuille1.png")
 e.resources.image(1, "./assests/images/stuff.png")
 e.resources.image(2, "./assests/images/caves.png")
@@ -56,7 +56,7 @@ game_map = Map(world)
 world.map = game_map
 if MAP_MODE == "single":
     game_map.generate(
-        MAP_BIOME, 50, 40,
+        MAP_BIOME, 30, 30,
         npc_count=2, player=player,
         npc_configs=[
             {"frames_dict": frames_dict, "max_health": 80, "speed": 0.6, "punch_damage": 4, "punch_cooldown": 40},
@@ -66,7 +66,7 @@ if MAP_MODE == "single":
             {"cls": Sword, "bank": stuff, "name": "Sword", "damage": 30, "dropped_pos": (5, 9), "count": 2 , "held_pos":(4,9) },
             {"cls": Crossbow, "bank": stuff, "name": "Crossbow", "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
-            {"cls": Chest, "bank": stuff, "image_x": 0, "image_y": 5, "placed_pos": (7, 10), "count": 1,}
+            {"cls": Chest, "bank": stuff, "image_x": 0, "image_y": 5, "placed_pos": (2, 10), "count": 1,}
         ],
         tile_images={
             "wall_sprites": {
@@ -78,7 +78,7 @@ if MAP_MODE == "single":
             },
             4 : {"bank":stuff,"image_x":1,"image_y":5},
         },
-        tile_whitelist=(1,2,3,5,4)
+        tile_whitelist=(1,2,3,5,4,10,11,12,13)
     )
 elif MAP_MODE == "island":
     game_map.generate_island(
@@ -114,8 +114,8 @@ elif MAP_MODE == "surface":
             {"frames_dict": frames_dict2, "max_health": 150, "speed": 0.4, "detection_radius": 90, "punch_damage": 8, "punch_cooldown": 50},
         ],
         item_configs=[
-            {"cls": Sword, "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
-            {"cls": Crossbow, "bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
+            {"cls": Sword,"name":"", "bank": stuff, "damage": 30, "dropped_pos": (3, 9), "count": 2},
+            {"cls": Crossbow, "name":"","bank": stuff, "damage": 15, "dropped_pos": (0, 9), "fire_timer": 10, "count": 1},
             {"cls": Consumable, "bank": None, "name": "Potion", "heal_amount": 15, "dropped_pos": (0, 0), "count": 4},
         ],
     )

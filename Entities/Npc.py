@@ -533,7 +533,7 @@ class Npc(Object):
             self.velocity_y = 0.0
 
         # Set direction from velocity — 4-directional, zero out other axis
-        if speed > 0.1:
+        if speed2 > 0.01:
             if abs(self.velocity_x) > abs(self.velocity_y):
                 self.direction = "right" if self.velocity_x > 0 else "left"
                 self.velocity_y = 0
@@ -544,7 +544,7 @@ class Npc(Object):
         # Apply movement
         self._apply_velocity()
 
-        if speed > 0.5 and e.frame_count() % 7 == 0:
+        if speed2 > 0.25 and e.frame_count() % 7 == 0:
             try:
                 from Entities.Particle import spawn_dust
                 spawn_dust(self.x + self.w / 2, self.y + self.h, world, amount=1)

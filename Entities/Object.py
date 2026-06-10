@@ -23,7 +23,7 @@ class Object:
     @property
     def hitbox(self):
         ins = self.hitbox_inset
-        return (self.x + ins, self.y + ins, self.w - ins * 2, self.h - ins * 2)
+        return (self.x + ins, self.y + ins*3, self.w - ins*2, self.h - ins * 3 )
 
     def is_collid(self, other):
         hx, hy, hw, hh = self.hitbox
