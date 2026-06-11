@@ -4,6 +4,7 @@ from Engine import engine
 from Entities.Block import Block
 from Entities.Player import Player
 from Entities.Particle import Particle
+from Entities.Light import Light, render_light_overlay
 
 class SpatialHash:
     def __init__(self, cell_size=16):
@@ -68,6 +69,7 @@ class World:
         self._cam_y = 0.0
         self._cam_w = 0
         self._cam_h = 0
+        self.lights = []
 
     def add_floating_text(self, x, y, text, color, lifetime):
         self.floating_texts.append(FloatingText(x, y, text, color, lifetime))
@@ -136,6 +138,9 @@ class World:
             if ft.lifetime <= 0:
                 self.floating_texts.remove(ft)
 
+        for light in self.lights:
+            light.update(self)
+
     def draw(self):
         """Dessine d'abord les blocs (fond), puis les entités triées par y."""
         cam_x = engine.graphics._camera_x
@@ -198,4 +203,8 @@ class World:
             engine.graphics.screen.blit(surf,
                 (ft.x + engine.graphics._camera_x - surf.get_width() // 2,
                  ft.y + engine.graphics._camera_y))
+
+        if self.lights:
+            overlay = render_light_overlay(self, cam_x, cam_y)
+            engine.graphics.screen.blit(overlay, (0, 0))
         

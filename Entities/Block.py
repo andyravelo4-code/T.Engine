@@ -9,6 +9,7 @@ class Block(Object):
         self.image_y = image_y
         self.color = color if color else (100, 100, 100)
         self.indestructible = indestructible
+        self.reflective = False
 
     def take_damage(self, amount, world, angle=None):
         if self.indestructible:

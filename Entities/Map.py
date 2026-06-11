@@ -918,6 +918,7 @@ class Map:
                         )
                     block.blocking = True
                     block.indestructible = True
+                    block.reflective = True
                     self.world.add(block)
                     continue
 
@@ -987,6 +988,7 @@ class Map:
                         block.is_floor = True
                 if (biome == "dungeon" or biome == "cave") and tile == 1:
                     block.indestructible = True
+                    block.reflective = True
                 if tile in (4,):
                     block.pushable = True
                 self.world.add(block)

@@ -8,6 +8,7 @@ from Items.Sword import Sword
 from Items.Crossbow import Crossbow
 from Items.Consumable import Consumable
 from Entities.Chest import Chest
+from Entities.Light import Light
 
 MAP_MODE = "single"
 MAP_BIOME = "dungeon"
@@ -136,10 +137,13 @@ elif MAP_MODE == "multi":
         ],
     )
 bg_color = game_map.bg_color
-
 cam = e.Camera(player, e.width(), e.height(), mouse_influence=0.2, mouse_limit=10)
 e.active_camera = cam
 inventory = Inventory(player)
+
+from Entities.Light import Light
+torch = Light(0, 0, 80, num_rays=32, reflective_bounce=True, arc_degrees=360)
+world.lights.append(torch)
 
 
 def update():
@@ -147,6 +151,9 @@ def update():
         world.update()
         cam.update()
     cam.apply()
+
+    torch.x = e._global_mouse_pos[0]
+    torch.y = e._global_mouse_pos[1]
 
     if e.btnp(e.KEY_I):
         inventory.toggle()
