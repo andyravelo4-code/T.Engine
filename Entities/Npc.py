@@ -144,14 +144,14 @@ class Npc(Object):
         path.reverse()
         return path
 
-    def take_damage(self, amount, world):
+    def take_damage(self, amount, world, angle=None):
         if self.aggressive:
             self._aggro = True
         else:
             self._hit_flee_timer = 30
             self.path = []
             self._behavior_timer = 0
-        super().take_damage(amount, world)
+        super().take_damage(amount, world, angle=angle)
 
     def draw(self):
         # Draw shadow
@@ -261,10 +261,24 @@ class Npc(Object):
         if isinstance(self.current_item, Crossbow):
             current_attack_radius = 60
 
-        if self.aggressive:
-            self._update_aggressive(dist2, current_attack_radius)
+        # Apply knockback (regardless of state)
+        if abs(self.knockback_x) > 0.01 or abs(self.knockback_y) > 0.01:
+            self.x += self.knockback_x
+            self.y += self.knockback_y
+            self.knockback_x *= 0.65
+            self.knockback_y *= 0.65
+            if abs(self.knockback_x) < 0.05:
+                self.knockback_x = 0
+            if abs(self.knockback_y) < 0.05:
+                self.knockback_y = 0
+
+        if self.stun_timer > 0:
+            self.stun_timer -= 1
         else:
-            self._update_passive()
+            if self.aggressive:
+                self._update_aggressive(dist2, current_attack_radius)
+            else:
+                self._update_passive()
 
         super().update()
 
@@ -619,7 +633,7 @@ class Npc(Object):
                 angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
                 if abs(angle_diff) < math.radians(90):
                     self.hit_entities.append(entity)
-                    entity.take_damage(self.punch_damage, self.world)
+                    entity.take_damage(self.punch_damage, self.world, angle=self.punch_angle)
         if self.punch_timer <= 0:
             self.is_punching = False
 

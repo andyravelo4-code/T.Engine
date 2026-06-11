@@ -154,6 +154,16 @@ class Player(Object):
         self.velocity_x *= self.friction
         self.velocity_y *= self.friction
 
+        if abs(self.knockback_x) > 0.01 or abs(self.knockback_y) > 0.01:
+            self._rem_x += self.knockback_x
+            self._rem_y += self.knockback_y
+            self.knockback_x *= 0.65
+            self.knockback_y *= 0.65
+            if abs(self.knockback_x) < 0.05:
+                self.knockback_x = 0
+            if abs(self.knockback_y) < 0.05:
+                self.knockback_y = 0
+
         if e.btn(e.KEY_W) or e.btn(e.KEY_Z):
             self.direction = "up"
             self.velocity_y -= self.acceleration
@@ -337,7 +347,7 @@ class Player(Object):
                         angle_diff = (angle_to_entity - self.punch_angle + math.pi) % (2 * math.pi) - math.pi
                         if abs(angle_diff) < math.radians(90):
                             self.hit_entities.append(entity)
-                            entity.take_damage(5, self.world)
+                            entity.take_damage(5, self.world, angle=self.punch_angle)
                             if hasattr(e, 'active_camera'):
                                 e.active_camera.shake(3, 2)
                                 if getattr(entity, 'is_living', False):

@@ -10,11 +10,11 @@ class Block(Object):
         self.color = color if color else (100, 100, 100)
         self.indestructible = indestructible
 
-    def take_damage(self, amount, world):
+    def take_damage(self, amount, world, angle=None):
         if self.indestructible:
             return
         if self.blocking:
-            super().take_damage(amount, world)
+            super().take_damage(amount, world, angle=angle)
 
     def push_back(self, px, py, pw, ph, speed):
         if not (self.x < px + pw and self.x + self.w > px and

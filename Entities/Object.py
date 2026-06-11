@@ -1,3 +1,4 @@
+import math
 from Engine import engine as e
 import random
 
@@ -19,6 +20,9 @@ class Object:
         self.pushable = False
         self.max_health = 100
         self.health = 100
+        self.knockback_x = 0.0
+        self.knockback_y = 0.0
+        self.stun_timer = 0
 
     @property
     def hitbox(self):
@@ -37,20 +41,33 @@ class Object:
     def draw(self):
         pass
 
-    def take_damage(self, amount, world):
+    def take_damage(self, amount, world, angle=None):
         self.health -= amount
         died = self.health <= 0
 
         try:
-            from Entities.Particle import spawn_blood, spawn_hit, spawn_bones
+            from Entities.Particle import spawn_blood, spawn_hit, spawn_impact, spawn_bones
             if self.is_living:
                 spawn_blood(self.x + self.w / 2, self.y + self.h / 2, world)
             else:
                 spawn_hit(self.x + self.w / 2, self.y + self.h / 2, world, amount=3)
+            if angle is not None:
+                impact_count = 5 if self.is_living else 8
+                spawn_impact(self.x + self.w / 2, self.y + self.h / 2, world, angle, amount=impact_count)
             if died:
                 spawn_bones(self.x + self.w / 2, self.y + self.h / 2, world)
         except ImportError:
             pass
+
+        if angle is not None:
+            power = 3.5
+            if getattr(self, 'pushable', False):
+                self.x += math.cos(angle) * power * 2
+                self.y += math.sin(angle) * power * 2
+            else:
+                self.knockback_x += math.cos(angle) * power
+                self.knockback_y += math.sin(angle) * power
+                self.stun_timer = 6
 
         if died:
             try:

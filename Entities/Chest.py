@@ -16,10 +16,18 @@ class Chest(Object):
         self._shake_ox = 0
         self._shake_oy = 0
 
-    def take_damage(self, amount, world):
+    def take_damage(self, amount, world, angle=None):
         self.health -= amount
         self._shake_timer = 12
         self._shake_intensity = 3
+
+        try:
+            from Entities.Particle import spawn_impact
+            if angle is not None:
+                spawn_impact(self.x + self.w / 2, self.y + self.h / 2, world, angle, amount=8)
+        except ImportError:
+            pass
+
         died = self.health <= 0
         if died:
             self._spawn_item(world)

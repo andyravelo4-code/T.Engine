@@ -39,7 +39,7 @@ class Arrow(Object):
                 dx = entity.x + entity.w/2 - self.x
                 dy = entity.y + entity.h/2 - self.y
                 if dx * dx + dy * dy < 64:
-                    entity.take_damage(self.damage, self.world)
+                    entity.take_damage(self.damage, self.world, angle=self.angle)
                     if hasattr(e, 'active_camera'):
                         e.active_camera.shake(3, 2)
                         if entity.is_living:

@@ -84,7 +84,7 @@ class Sword(Item):
                     dy = entity.y + entity.h/2 - self.y
                     if dx * dx + dy * dy < 144 and entity not in self.hit_entities:
                             self.hit_entities.append(entity)
-                            entity.take_damage(self.damage, self.world)
+                            entity.take_damage(self.damage, self.world, angle=self.pos_angle)
                             if hasattr(e, 'active_camera'):
                                 e.active_camera.shake(5, 3)
                                 if getattr(entity, 'is_living', False):
