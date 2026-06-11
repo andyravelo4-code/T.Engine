@@ -263,8 +263,18 @@ class Npc(Object):
 
         # Apply knockback (regardless of state)
         if abs(self.knockback_x) > 0.01 or abs(self.knockback_y) > 0.01:
+            world = self.world
+            # Apply X
             self.x += self.knockback_x
+            if self._collides_at(self.x, self.y, world):
+                self.x -= self.knockback_x
+                self.knockback_x = 0
+            # Apply Y
             self.y += self.knockback_y
+            if self._collides_at(self.x, self.y, world):
+                self.y -= self.knockback_y
+                self.knockback_y = 0
+
             self.knockback_x *= 0.65
             self.knockback_y *= 0.65
             if abs(self.knockback_x) < 0.05:

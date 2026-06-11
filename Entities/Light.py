@@ -18,24 +18,45 @@ class Light:
         self.arc_degrees = arc_degrees  # spread angle (360 = full circle)
         self.ray_ends = []
         self.bounce_ends = []
+        self._prev_ray_ends = None
+        self._prev_bounce_ends = None
 
     def update(self, world):
-        self.ray_ends = []
-        self.bounce_ends = []
         arc_rad = math.radians(self.arc_degrees)
         start = self.angle - arc_rad / 2
+        new_ray_ends = []
+        new_bounce_ends = []
         for i in range(self.num_rays):
             t = (i / self.num_rays) if self.num_rays > 1 else 0.5
             angle = start + arc_rad * t
             end, bounce = self._cast_ray(angle, world)
-            self.ray_ends.append(end)
-            self.bounce_ends.append(bounce)
+            new_ray_ends.append(end)
+            new_bounce_ends.append(bounce)
+
+        if self._prev_ray_ends is not None and len(self._prev_ray_ends) == self.num_rays:
+            self.ray_ends = [
+                ((ex + self._prev_ray_ends[i][0]) * 0.5,
+                 (ey + self._prev_ray_ends[i][1]) * 0.5)
+                for i, (ex, ey) in enumerate(new_ray_ends)
+            ]
+            self.bounce_ends = [
+                (bounce if bounce is None else
+                 ((bounce[0] + (self._prev_bounce_ends[i][0] if self._prev_bounce_ends[i] else bounce[0])) * 0.5,
+                  (bounce[1] + (self._prev_bounce_ends[i][1] if self._prev_bounce_ends[i] else bounce[1])) * 0.5))
+                for i, bounce in enumerate(new_bounce_ends)
+            ]
+        else:
+            self.ray_ends = new_ray_ends
+            self.bounce_ends = new_bounce_ends
+
+        self._prev_ray_ends = list(self.ray_ends)
+        self._prev_bounce_ends = list(self.bounce_ends)
 
     def _cast_ray(self, angle, world):
         dx = math.cos(angle)
         dy = math.sin(angle)
         max_dist = self.radius
-        step = 4
+        step = 2
         cx, cy = self.x, self.y
 
         hit_x, hit_y = None, None
@@ -62,7 +83,7 @@ class Light:
                 rdx = dx - 2 * dot * normal[0]
                 rdy = dy - 2 * dot * normal[1]
                 bounce_dist = min(max_dist * 0.5, max_dist - math.sqrt((hit_x - cx)**2 + (hit_y - cy)**2))
-                for bd in range(4, int(bounce_dist), step):
+                for bd in range(2, int(bounce_dist), step):
                     bx = hit_x + rdx * bd
                     by = hit_y + rdy * bd
                     bounced = False

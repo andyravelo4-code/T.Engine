@@ -70,6 +70,7 @@ class World:
         self._cam_w = 0
         self._cam_h = 0
         self.lights = []
+        self.kills = 0
 
     def add_floating_text(self, x, y, text, color, lifetime):
         self.floating_texts.append(FloatingText(x, y, text, color, lifetime))

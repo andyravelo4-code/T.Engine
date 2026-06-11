@@ -218,10 +218,11 @@ class Inventory:
     def _can_equip(self, item, idx):
         from Items.Sword import Sword
         from Items.Crossbow import Crossbow
+        from Items.Bomb import Bomb
         if idx == 0:
-            return isinstance(item, Sword)
+            return isinstance(item, (Sword, Bomb))
         if idx == 1:
-            return isinstance(item, Crossbow)
+            return isinstance(item, (Crossbow, Bomb))
         return True
 
     # ── draw ───────────────────────────────────────────────────

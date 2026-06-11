@@ -49,26 +49,27 @@ class Map:
         "cave":    {1: (80, 75, 65), 3: (100, 220, 255)},
         "dungeon": {1: (70, 65, 60), 2: (55, 50, 45), 3: (160, 140, 60), 4: (65, 50, 35), 5: (60, 55, 50),
                     20: (85, 80, 75), 21: (85, 80, 75), 22: (75, 70, 65), 23: (75, 70, 65),
-                    24: (120, 105, 90), 25: (120, 105, 90), 26: (120, 105, 90), 27: (120, 105, 90)},
-        "island":  {2: (10, 55, 85), 3: (181, 174, 145), 4: (70, 65, 60)},
-        "plains":  {2: (10, 55, 85), 3: (60, 130, 60), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60)},
-        "hills":   {2: (10, 55, 85), 3: (55, 120, 55), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60)},
-        "rocky_plains": {2: (10, 55, 85), 1: (100, 100, 100), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60)},
-        "forest":  {2: (10, 55, 85), 3: (40, 100, 40), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60)},
-        "desert":  {2: (10, 55, 85), 5: (200, 180, 120), 4: (160, 140, 100), 10: (220, 200, 80), 11: (80, 120, 60), 12: (200, 120, 160), 13: (70, 140, 60)},
-        "mountains": {2: (10, 55, 85), 1: (140, 140, 150), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60)},
+                    24: (120, 105, 90), 25: (120, 105, 90), 26: (120, 105, 90), 27: (120, 105, 90),
+                    14: (255, 180, 80)},
+        "island":  {2: (10, 55, 85), 3: (181, 174, 145), 4: (70, 65, 60), 14: (255, 180, 80)},
+        "plains":  {2: (10, 55, 85), 3: (60, 130, 60), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
+        "hills":   {2: (10, 55, 85), 3: (55, 120, 55), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
+        "rocky_plains": {2: (10, 55, 85), 1: (100, 100, 100), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
+        "forest":  {2: (10, 55, 85), 3: (40, 100, 40), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
+        "desert":  {2: (10, 55, 85), 5: (200, 180, 120), 4: (160, 140, 100), 10: (220, 200, 80), 11: (80, 120, 60), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
+        "mountains": {2: (10, 55, 85), 1: (140, 140, 150), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
     }
 
     NON_BLOCKING_TILES = {
         "cave": {3},
-        "dungeon": {2,3},
+        "dungeon": {2, 3, 14},
         "island": {2, 3, 4},
-        "plains": {3, 5, 6, 10, 11, 12, 13},
-        "hills": {3, 5, 6, 4, 10, 11, 12, 13},
-        "rocky_plains": {1, 5, 10, 11, 12, 13},
-        "forest": {3, 5, 6, 10, 11, 12, 13},
-        "desert": {5, 2, 4, 10, 11, 12, 13},
-        "mountains": {5, 10, 11, 12, 13},
+        "plains": {3, 5, 6, 10, 11, 12, 13, 14},
+        "hills": {3, 5, 6, 4, 10, 11, 12, 13, 14},
+        "rocky_plains": {1, 5, 10, 11, 12, 13, 14},
+        "forest": {3, 5, 6, 10, 11, 12, 13, 14},
+        "desert": {5, 2, 4, 10, 11, 12, 13, 14},
+        "mountains": {5, 10, 11, 12, 13, 14},
     }
 
     # Tuiles considerees comme "interieur d'une salle" (sol + decoration).
@@ -99,54 +100,54 @@ class Map:
     WALL_TILE_IDS = frozenset(WALL_TILES.values())
 
     BIOME_CONFIG = {
-        "plains": {
-            "surface": 3,
-            "decoration": None,
-            "decoration_chance": 0.02,
-            "decoration_variants": [(10, 3), (11, 2), (13, 1)],
-            "base_height": 0.38,
-            "height_amp": 0.18,
-        },
-        "hills": {
-            "surface": 3,
-            "decoration": 4,
-            "decoration_chance": 0.04,
-            "decoration_variants": [(10, 2), (11, 3), (13, 1)],
-            "base_height": 0.50,
-            "height_amp": 0.28,
-        },
-        "rocky_plains": {
-            "surface": 1,
-            "decoration": 4,
-            "decoration_chance": 0.08,
-            "decoration_variants": [(11, 2), (12, 1)],
-            "base_height": 0.45,
-            "height_amp": 0.18,
-        },
-        "forest": {
-            "surface": 3,
-            "decoration": 7,
-            "decoration_chance": 0.14,
-            "decoration_variants": [(10, 3), (11, 4), (12, 1), (13, 2)],
-            "base_height": 0.42,
-            "height_amp": 0.22,
-        },
-        "desert": {
-            "surface": 5,
-            "decoration": 4,
-            "decoration_chance": 0.02,
-            "decoration_variants": [(10, 1), (13, 2)],
-            "base_height": 0.35,
-            "height_amp": 0.10,
-        },
-        "mountains": {
-            "surface": 1,
-            "decoration": None,
-            "decoration_chance": 0.03,
-            "decoration_variants": [(11, 2), (12, 1)],
-            "base_height": 0.65,
-            "height_amp": 0.35,
-        },
+    "plains": {
+        "surface": 3,
+        "decoration": None,
+        "decoration_chance": 0.02,
+        "decoration_variants": [(10, 3), (11, 2), (13, 1), (14, 1)],
+        "base_height": 0.38,
+        "height_amp": 0.18,
+    },
+    "hills": {
+        "surface": 3,
+        "decoration": 4,
+        "decoration_chance": 0.04,
+        "decoration_variants": [(10, 2), (11, 3), (13, 1), (14, 1)],
+        "base_height": 0.50,
+        "height_amp": 0.28,
+    },
+    "rocky_plains": {
+        "surface": 1,
+        "decoration": 4,
+        "decoration_chance": 0.08,
+        "decoration_variants": [(11, 2), (12, 1), (14, 1)],
+        "base_height": 0.45,
+        "height_amp": 0.18,
+    },
+    "forest": {
+        "surface": 3,
+        "decoration": 7,
+        "decoration_chance": 0.14,
+        "decoration_variants": [(10, 3), (11, 4), (12, 1), (13, 2), (14, 1)],
+        "base_height": 0.42,
+        "height_amp": 0.22,
+    },
+    "desert": {
+        "surface": 5,
+        "decoration": 4,
+        "decoration_chance": 0.02,
+        "decoration_variants": [(10, 1), (13, 2), (14, 1)],
+        "base_height": 0.35,
+        "height_amp": 0.10,
+    },
+    "mountains": {
+        "surface": 1,
+        "decoration": None,
+        "decoration_chance": 0.03,
+        "decoration_variants": [(11, 2), (12, 1), (14, 1)],
+        "base_height": 0.65,
+        "height_amp": 0.35,
+    },
     }
 
     def __init__(self, world, tile_size=8):
@@ -661,6 +662,17 @@ class Map:
                     if any(self.grid[y + dy][x + dx] == 1 for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
                         self.grid[y][x] = 4
 
+        # Sources de lumiere dans les salles
+        for rx, ry, rw, rh in rooms:
+            count = random.randint(1, 2)
+            for _ in range(count):
+                for attempt in range(5):
+                    px = rx + random.randint(1, max(1, rw - 2))
+                    py = ry + random.randint(1, max(1, rh - 2))
+                    if self.grid[py][px] == 2:
+                        self.grid[py][px] = 14
+                        break
+
         # Dégager la zone de spawn
         cx, cy = (x1 + x2) // 2, self.height // 2
         for dy in range(-2, 3):
@@ -992,6 +1004,17 @@ class Map:
                 if tile in (4,):
                     block.pushable = True
                 self.world.add(block)
+
+                # Spawn light source if tile config has dark:True
+                if tile_images and tile in tile_images:
+                    cfg = tile_images[tile]
+                    if cfg.get("dark"):
+                        from Entities.Light import Light
+                        lx = x * self.tile_size + self.tile_size / 2
+                        ly = y * self.tile_size + self.tile_size / 2
+                        light = Light(lx, ly, 45, num_rays=16, reflective_bounce=False,
+                                      arc_degrees=360, intensity=0.7, color=(255, 200, 120))
+                        self.world.lights.append(light)
 
     def get_spawn_point(self):
         cx, cy = self.width // 2, self.height // 2

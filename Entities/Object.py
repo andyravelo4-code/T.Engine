@@ -62,8 +62,26 @@ class Object:
         if angle is not None:
             power = 3.5
             if getattr(self, 'pushable', False):
-                self.x += math.cos(angle) * power * 2
-                self.y += math.sin(angle) * power * 2
+                dx = math.cos(angle) * power * 2
+                dy = math.sin(angle) * power * 2
+                self.x += dx
+                for entity in world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 16):
+                    if entity is self:
+                        continue
+                    if getattr(entity, 'blocking', False):
+                        if (self.x < entity.x + entity.w and self.x + self.w > entity.x and
+                            self.y < entity.y + entity.h and self.y + self.h > entity.y):
+                            self.x -= dx
+                            break
+                self.y += dy
+                for entity in world.get_nearby(self.x + self.w / 2, self.y + self.h / 2, 16):
+                    if entity is self:
+                        continue
+                    if getattr(entity, 'blocking', False):
+                        if (self.x < entity.x + entity.w and self.x + self.w > entity.x and
+                            self.y < entity.y + entity.h and self.y + self.h > entity.y):
+                            self.y -= dy
+                            break
             else:
                 self.knockback_x += math.cos(angle) * power
                 self.knockback_y += math.sin(angle) * power
@@ -76,6 +94,10 @@ class Object:
                     engine.active_camera.flash((120, 255, 120), 35, 10)
             except ImportError:
                 pass
+            if self.is_living and world is not None:
+                from Entities.Player import Player
+                if not isinstance(self, Player):
+                    world.kills += 1
             world.remove(self)
 
     def update(self):
