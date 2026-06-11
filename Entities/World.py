@@ -3,7 +3,7 @@ import Engine.engine
 from Engine import engine
 from Entities.Block import Block
 from Entities.Player import Player
-
+from Entities.Particle import Particle
 
 class SpatialHash:
     def __init__(self, cell_size=16):
@@ -145,8 +145,8 @@ class World:
         cx = -cam_x + sw / 2
         cy = -cam_y + sh / 2
 
-        near = self.spatial.get_near(cx, cy, 70)
-        d2max = 4600
+        near = self.spatial.get_near(cx, cy, 100)
+        d2max = 8600
 
         floor_blocks = [e for e in near if isinstance(e, Block) and getattr(e, 'is_floor', False)]
         for e in floor_blocks:
@@ -157,7 +157,15 @@ class World:
                 dy = e.y + e.h / 2 - cy
                 if dx * dx + dy * dy < d2max:
                     e.draw()
-
+        floor_blocks = [e for e in near if isinstance(e, Particle) ]
+        for e in floor_blocks:
+            sx = e.x + cam_x
+            sy = e.y + cam_y
+            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh:
+                dx = e.x + e.w / 2 - cx
+                dy = e.y + e.h / 2 - cy
+                if dx * dx + dy * dy < d2max:
+                    e.draw()
         fixed_blocks = [e for e in near if isinstance(e, Block) and not getattr(e, 'pushable', False) and not getattr(e, 'is_floor', False)]
         for e in sorted(fixed_blocks, key=lambda e: e.y):
             sx = e.x + cam_x
@@ -168,7 +176,7 @@ class World:
                 if dx * dx + dy * dy < d2max:
                     e.draw()
 
-        others = [e for e in near if not isinstance(e, Block)]
+        others = [e for e in near if not isinstance(e, Block) and not isinstance(e,Particle)]
         for e in sorted(others, key=lambda e: e.y):
             dx = e.x + e.w / 2 - cx
             dy = e.y + e.h / 2 - cy
@@ -179,8 +187,11 @@ class World:
         for e in sorted(pushable_blocks, key=lambda e: e.y):
             sx = e.x + cam_x
             sy = e.y + cam_y
-            if sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh:
+            dx = e.x + e.w / 2 - cx
+            dy = e.y + e.h / 2 - cy
+            if dx * dx + dy * dy < d2max and (sx + e.w > 0 and sx < sw and sy + e.h > 0 and sy < sh):
                 e.draw()
+            else : continue
 
         for ft in self.floating_texts:
             surf = ft.get_surface()

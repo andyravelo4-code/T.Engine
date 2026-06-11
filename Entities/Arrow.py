@@ -18,6 +18,7 @@ class Arrow(Object):
         self.sprite_pos = sprite_pos
         self.angle = angle
         self.speed = 4
+        self.hitbox_inset=2
         self.lifetime = 60  # Disparaît après 60 frames
         self.offset = random.uniform(-0.1, 0.1)
 

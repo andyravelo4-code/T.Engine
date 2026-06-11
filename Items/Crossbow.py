@@ -68,8 +68,8 @@ class Crossbow(Item):
 
     def draw(self):
         if not self.picked_up:
-            self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(2, 2))
-            self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=30)
+            #self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(2, 2))
+            self.draw_image(self.dropped_pos[0], self.dropped_pos[1])
 
         elif self.parent and self.parent.current_item == self:
             idx_x = self.held_fire_pos[0] if self.is_firing else self.held_idle_pos[0]
@@ -78,11 +78,6 @@ class Crossbow(Item):
             mouse_angle = math.atan2(
                 e._global_mouse_pos[1] - (self.parent.y + self.parent.h / 2),
                 e._global_mouse_pos[0] - (self.parent.x + self.parent.w / 2),
-            )
-            e.pset(
-                int((self.parent.x + self.w / 2) + 5 * math.cos(mouse_angle)),
-                int((self.parent.y + self.h / 2) + 5 * math.sin(mouse_angle)),
-                (237, 199, 176),
             )
 
     def fire(self, angle):

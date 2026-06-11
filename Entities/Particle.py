@@ -61,11 +61,11 @@ class Particle:
         if sz <= 1:
             e.pset(int(self.x), int(self.y), draw_color)
         else:
-            e.rect(int(self.x), int(self.y), sz, sz, draw_color)
+            e.elli(int(self.x), int(self.y), sz, sz, draw_color)
 
 
 def spawn_blood(x, y, world, amount=15):
-    for _ in range(amount):
+    """for _ in range(amount):
         angle = random.uniform(0, 2 * math.pi)
         speed = random.uniform(1.0, 3.5)
         vx = math.cos(angle) * speed
@@ -76,16 +76,16 @@ def spawn_blood(x, y, world, amount=15):
         color = (r, g, b, random.randint(180, 255))
         lifetime = random.randint(20, 35)
         p = Particle(x, y, vx, vy, color, lifetime, size=1, gravity=True, bounce=True)
-        world.add(p)
+        world.add(p)"""
 
     # Splatter near ground
     for _ in range(amount // 2):
-        px = x + random.uniform(-8, 8)
+        px = x + random.uniform(-4, 4)
         py = y + random.uniform(0, 4)
         vx = random.uniform(-0.3, 0.3)
-        vy = random.uniform(-0.5, 0)
+        vy = random.uniform(-0.3, 0)
         color = (random.randint(120, 180), 0, 0, random.randint(100, 180))
-        p = Particle(px, py, vx, vy, color, random.randint(10, 18), size=1, gravity=True, bounce=False)
+        p = Particle(px, py, vx, vy, color, random.randint(20, 308), size=2, gravity=False, bounce=True)
         world.add(p)
 
 
@@ -159,6 +159,6 @@ def spawn_bones(x, y, world, amount=6):
         color = (val, val, val - 20, random.randint(180, 255))
         lifetime = random.randint(20, 40)
         p = Particle(x + random.uniform(-1, 1), y + random.uniform(-1, 1),
-                     vx, vy, color, lifetime, size=1,
+                     vx, vy, color, lifetime, size=2,
                      gravity=True, bounce=True)
         world.add(p)

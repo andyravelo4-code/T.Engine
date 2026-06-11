@@ -61,7 +61,7 @@ class Map:
 
     NON_BLOCKING_TILES = {
         "cave": {3},
-        "dungeon": {2},
+        "dungeon": {2,3},
         "island": {2, 3, 4},
         "plains": {3, 5, 6, 10, 11, 12, 13},
         "hills": {3, 5, 6, 4, 10, 11, 12, 13},
@@ -647,10 +647,10 @@ class Map:
         # Points d'eau décoratifs
         placed_loot = set()
         for rx, ry, rw, rh in rooms:
-            for _ in range(random.randint(0, 1)):
+            for _ in range(random.randint(0, 3)):
                 px = rx + random.randint(1, max(1, rw - 2))
                 py = ry + random.randint(1, max(1, rh - 2))
-                if self.grid[py][px] == 2 and (px, py) not in placed_loot:
+                if self.grid[py][px] == 2 :#and (px, py) not in placed_loot:
                     self.grid[py][px] = 3
                     placed_loot.add((px, py))
 

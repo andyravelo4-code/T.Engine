@@ -1055,6 +1055,8 @@ class Graphics:
 # ----------------------------------------------------------------------
 # Caméra
 # ----------------------------------------------------------------------
+def lerp(a,b,t):
+    return a+t*(b-a)
 class Camera:
     def __init__(self, target, screen_width, screen_height,
                  mouse_influence=0.2, mouse_limit=10):
@@ -1114,10 +1116,13 @@ class Camera:
         dy = max(-self.mouse_limit, min(self.mouse_limit, dy))
         tsx = cx - dx
         tsy = cy - dy
-        self.cam_x = tsx - self.target.x + self.shake_offset_x
-        self.cam_y = tsy - self.target.y + self.shake_offset_y
+        self.cam_x = lerp(self.cam_x,tsx-self.target.x,0.1)+self.shake_offset_x
+        self.cam_y = lerp(self.cam_y,tsy-self.target.y,0.1)+self.shake_offset_y
+        #self.cam_x = tsx - self.target.x + self.shake_offset_x 
+        #self.cam_y = tsy - self.target.y + self.shake_offset_y
 
     def apply(self):
+        
         camera(self.cam_x, self.cam_y)
 
 

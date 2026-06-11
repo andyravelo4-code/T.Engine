@@ -38,7 +38,7 @@ class Player(Object):
         self.max_speed = 1.4
 
     def draw(self):
-        e.blt(
+        """e.blt(
             self.x,
             self.y + 1,
             self.bank,
@@ -46,8 +46,8 @@ class Player(Object):
             (self.image_y + 0) * 8,
             8,
             8,
-        )
-
+        )"""
+        e.elli(self.x,self.y+6,7,4,(0,0,0,100))
         last_dir_dict = {"up": 6, "down": 7, "left": 5, "right": 4}
         match self.direction:
             case "idle":
@@ -200,7 +200,7 @@ class Player(Object):
 
         if not self.current_item and self.is_punching:
             progress = 1.0 - (self.punch_timer / self.punch_duration)
-            lunge_speed = 4 * (1.0 - progress)
+            lunge_speed = 3 * (1.0 - progress)
             self._rem_x += math.cos(self.punch_angle) * lunge_speed
             self._rem_y += math.sin(self.punch_angle) * lunge_speed
             moving = True
@@ -215,7 +215,7 @@ class Player(Object):
 
             slash_angle = math.atan2(target_y - self.y, target_x - self.x)
             progress = 1.0 - (self.current_item.slash_timer / self.current_item.slash_duration)
-            lunge_speed = 4.5 * (1.0 - progress)
+            lunge_speed = 3 * (1.0 - progress)
             self._rem_x += math.cos(slash_angle) * lunge_speed
             self._rem_y += math.sin(slash_angle) * lunge_speed
             moving = True            
