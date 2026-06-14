@@ -22,7 +22,7 @@ class Crossbow(Item):
         self.held_idle_pos = held_idle_pos
         self.held_fire_pos = held_fire_pos
         self.rotation = 0
-        self.radius = 5
+        self.radius = 7
         self.is_firing = False
         self.fire_duration = fire_timer
         self.fire_timer = 0
@@ -69,7 +69,7 @@ class Crossbow(Item):
     def draw(self):
         if not self.picked_up:
             #self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(2, 2))
-            self.draw_image(self.dropped_pos[0], self.dropped_pos[1])
+            self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=45)
 
         elif self.parent and self.parent.current_item == self:
             idx_x = self.held_fire_pos[0] if self.is_firing else self.held_idle_pos[0]

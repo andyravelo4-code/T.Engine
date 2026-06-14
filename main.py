@@ -78,7 +78,7 @@ if MAP_MODE == "single":
                 26: (0, 2), 27: (2, 2),
             },
             4 : {"bank":stuff,"image_x":1,"image_y":5},
-            3 : {"bank":stuff,"variants":[(1,4),(2,4),(0,4), (0,3),(1,3),(3,5)]},
+            3 : {"bank":stuff,"variants":[(1,4),(2,4),(0,4), (0,3),(1,3),(3,5),(3,4)]+[(i,2) for i in range(3)]},
             #2 : {"bank":floor,"variants":[(9,2)]},
         },
         tile_whitelist=(1,2,3,5,4,10,11,12,13)
@@ -143,7 +143,7 @@ inventory = Inventory(player)
 
 from Entities.Light import Light
 torch = Light(0, 0, 80, num_rays=32, reflective_bounce=True, arc_degrees=360)
-world.lights.append(torch)
+#world.lights.append(torch)
 
 
 def update():
@@ -151,9 +151,6 @@ def update():
         world.update()
         cam.update()
     cam.apply()
-
-    torch.x = e._global_mouse_pos[0]
-    torch.y = e._global_mouse_pos[1]
 
     if e.btnp(e.KEY_I):
         inventory.toggle()

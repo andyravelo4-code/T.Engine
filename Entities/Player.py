@@ -5,14 +5,15 @@ from PIL import Image, ImageDraw
 from Engine import engine as e
 from Entities.Object import Object
 from Entities.Npc import Npc
-
+from Items.Sword import Sword
+from Items.Crossbow import Crossbow
 
 class Player(Object):
     MAX_STORAGE = 25
     MAX_CRAFTING = 4
     MAX_EQUIP = 2
 
-    def __init__(self, x, y, w, h, bank, world=None, image_x=0, image_y=0):
+    def __init__(self, x, y, w, h, bank, world=None, image_x=5, image_y=0):
         super().__init__(x, y, w, h, bank)
         self.world = world
         self.image_x = image_x
@@ -47,7 +48,7 @@ class Player(Object):
             8,
             8,
         )"""
-        e.elli(self.x,self.y+6,7,4,(0,0,0,100))
+        e.elli(self.x,self.y+6,8,4,(0,0,0,70))
         last_dir_dict = {"up": 6, "down": 7, "left": 5, "right": 4}
         match self.direction:
             case "idle":
@@ -66,7 +67,17 @@ class Player(Object):
                 self.animate(0, 0, 5, 4)
         super().draw()
         if self.current_item:
+            theta =  math.atan2(
+                    e._global_mouse_pos[1] - (self.y + self.h / 2),
+                    e._global_mouse_pos[0] - (self.x + self.w / 2)-1,
+                ) 
+            b =  -((math.pi/2)*self.current_item.n) if isinstance(self.current_item,Sword) else 0
+            theta+=b
+            hx = self.x-1+self.w/2 + 5*math.cos(theta)
+            hy = self.y+self.h/2 + 5*math.sin(theta) -1       
             self.current_item.draw()
+            
+            e.elli(hx,hy,2,2,(230,156,105,255))
 
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
@@ -78,6 +89,7 @@ class Player(Object):
 
         e.pset(int(self.x-1 + self.w / 2), int(self.y-1), color)
 
+        
         if self.is_punching:
             if not hasattr(self, '_punch_cache') or self._punch_angle != self.punch_angle:
                 self._punch_cache = {}
@@ -189,7 +201,7 @@ class Player(Object):
             self.velocity_x = 0.0
         if abs(self.velocity_y) < 0.05:
             self.velocity_y = 0.0
-
+        
         speed2 = self.velocity_x * self.velocity_x + self.velocity_y * self.velocity_y
         max_s2 = self.max_speed * self.max_speed
         if speed2 > max_s2:

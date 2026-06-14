@@ -648,7 +648,7 @@ class Map:
         # Points d'eau décoratifs
         placed_loot = set()
         for rx, ry, rw, rh in rooms:
-            for _ in range(random.randint(0, 3)):
+            for _ in range(random.randint(1, 10)):
                 px = rx + random.randint(1, max(1, rw - 2))
                 py = ry + random.randint(1, max(1, rh - 2))
                 if self.grid[py][px] == 2 :#and (px, py) not in placed_loot:

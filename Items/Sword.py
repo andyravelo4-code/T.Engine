@@ -21,7 +21,7 @@ class Sword(Item):
         self.dropped_pos = dropped_pos
         self.held_pos = held_pos
         self.rotation = 0
-        self.radius = 5.5
+        self.radius = 10
         self.pos_angle = 0
         self.start_slash_angle = 0
         self.cooldown = cooldown
@@ -29,7 +29,7 @@ class Sword(Item):
         # État de l'animation d'attaque (slash)
         self.is_slashing = False
         self.slash_timer = 0
-        self.slash_duration = 6
+        self.slash_duration = 7
         self.p = 1  # Direction du balancement
         self.n = 1  # Côté de repos
         self.flipped = False  # État du miroir du sprite
@@ -94,14 +94,14 @@ class Sword(Item):
                 self.is_slashing = False
         else:
             # État de repos : l'épée suit la souris
-            self.radius = 7
+            self.radius = 9
             target_pos_angle = mouse_angle - (math.pi / 2) * self.n
 
             # Interpolation fluide
             diff = (target_pos_angle - self.pos_angle + math.pi) % (
                 2 * math.pi
             ) - math.pi
-            self.pos_angle += diff * 0.2
+            self.pos_angle += diff * 1
 
             # La rotation suit l'angle de position
             self.rotation = math.degrees(self.pos_angle)
@@ -111,8 +111,8 @@ class Sword(Item):
 
     def draw(self):
         if not self.picked_up:
-            self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(0, 1))
-            self.draw_image(self.dropped_pos[0], self.dropped_pos[1])
+            #self.draw_image(self.shadow_pos[0], self.shadow_pos[1], offset=(0, 1))
+            self.draw_image(self.dropped_pos[0], self.dropped_pos[1], rotate=45)
 
         elif self.parent and self.parent.current_item == self:
             # Draw slash arc

@@ -129,6 +129,7 @@ class World:
 
         self.update_active_npc()
         for entity in list(self.entities):
+            if isinstance(entity,Block) : continue
             entity.update()
             if hasattr(entity, "lifetime") and entity.lifetime <= 0:
                 self.remove(entity)
