@@ -1185,14 +1185,15 @@ class App:
             g = self.graphics
             if g.screen and hasattr(self, '_flash') and self._flash_alpha > 0:
                 pass  # flash géré via entité
-
-            try:
+            update()
+            draw()
+            """try:
                 update()
                 draw()
             except Exception as err:
                 import traceback
                 traceback.print_exc()
-                self.running = False
+                self.running = False"""
 
             self.input.update()
             self.graphics.flush()

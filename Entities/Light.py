@@ -138,7 +138,7 @@ def render_light_overlay(world, cam_x, cam_y):
     sw = e.width()
     sh = e.height()
 
-    darkness = Image.new('RGBA', (sw, sh), (0, 0, 0, 200))
+    darkness = Image.new('RGBA', (sw, sh), (0, 0, 0, 255))
     mask = Image.new('L', (sw, sh), 0)
     draw = ImageDraw.Draw(mask)
 

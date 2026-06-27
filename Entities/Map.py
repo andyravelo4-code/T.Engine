@@ -5,7 +5,7 @@ from Entities.Npc import Npc
 from Entities.Chest import Chest
 from Items.Sword import Sword
 from Items.Crossbow import Crossbow
-
+from Entities.Player import Player
 
 class Map:
     # Tuiles par biome :
@@ -56,7 +56,7 @@ class Map:
         "hills":   {2: (10, 55, 85), 3: (55, 120, 55), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
         "rocky_plains": {2: (10, 55, 85), 1: (100, 100, 100), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
         "forest":  {2: (10, 55, 85), 3: (40, 100, 40), 4: (100, 100, 100), 5: (200, 180, 120), 6: (130, 100, 60), 7: (90, 60, 30), 10: (220, 200, 80), 11: (50, 110, 50), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
-        "desert":  {2: (10, 55, 85), 5: (200, 180, 120), 4: (160, 140, 100), 10: (220, 200, 80), 11: (80, 120, 60), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
+        "desert":  {2: (10, 55, 85), 5: (180, 160, 110), 4: (160, 140, 100), 10: (220, 200, 80), 11: (80, 120, 60), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
         "mountains": {2: (10, 55, 85), 1: (140, 140, 150), 4: (120, 115, 110), 5: (200, 180, 120), 10: (220, 200, 80), 11: (60, 100, 60), 12: (200, 120, 160), 13: (70, 140, 60), 14: (255, 180, 80)},
     }
 
@@ -160,6 +160,7 @@ class Map:
         self.bg_color = (0, 0, 0)
         self.biome_grid = None
         self.room_tiles = set()
+        self.player = None
 
     FILL_TILE = 8
 
@@ -211,6 +212,7 @@ class Map:
 
         spawn = self.get_spawn_point()
         if player:
+            self.player = player
             player.x = spawn[0]
             player.y = spawn[1]
 
@@ -567,7 +569,7 @@ class Map:
             for x in range(x1, x2):
                 self.grid[y][x] = 0
 
-        gap = 6
+        gap =6
         base_w, base_h = 7, 7
         strip_w = x2 - x1
         cols = max(2, strip_w // (base_w + gap))
@@ -849,11 +851,11 @@ class Map:
 
         for y in range(self.height):
             for x in range(x1, x2):
-                self.grid[y][x] = 2 if h[y][x] < 0.35 else 3
+                self.grid[y][x] = 2 if h[y][x] < 0.15 else 3
 
         for y in range(2, self.height - 2):
             for x in range(max(2, x1 + 1), min(x2 - 1, self.width - 2)):
-                if self.grid[y][x] == 3 and random.random() < 0.06:
+                if self.grid[y][x] == 3 and random.random() < 1:
                     self.grid[y][x] = 4
 
     def _build_blocks(self, tile_images=None):

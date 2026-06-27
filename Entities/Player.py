@@ -76,8 +76,8 @@ class Player(Object):
             hx = self.x-1+self.w/2 + 5*math.cos(theta)
             hy = self.y+self.h/2 + 5*math.sin(theta) -1       
             self.current_item.draw()
-            
-            e.elli(hx,hy,2,2,(230,156,105,255))
+            #e.pset(hx,hy,(230,156,105,255))#(191,111,74,255))
+            e.elli(hx,hy,2,2,(191,111,74,255))#(230,156,105,255))
 
         health_ratio = max(0, self.health / self.max_health)
         if health_ratio > 0.6:
@@ -293,7 +293,7 @@ class Player(Object):
                     self.velocity_y = 0
                     break
 
-        if in_attack:
+        if in_attack :
             angle = math.atan2(
                 e._global_mouse_pos[1] - (self.y + self.h / 2),
                 e._global_mouse_pos[0] - (self.x + self.w / 2),

@@ -155,8 +155,9 @@ class Npc(Object):
 
     def draw(self):
         # Draw shadow
-        shadow_x, shadow_y = self.frames_dict.get("shadow", (4, 0))
-        e.blt(int(self.x), int(self.y + 1), self.bank, (self.image_x + shadow_x) * 8, (self.image_y + shadow_y) * 8, 8, 8)
+        #shadow_x, shadow_y = self.frames_dict.get("shadow", (4, 0))
+        e.elli(self.x,self.y+6,8,4,(0,0,0,70))
+        #e.blt(int(self.x), int(self.y + 1), self.bank, (self.image_x + shadow_x) * 8, (self.image_y + shadow_y) * 8, 8, 8)
         match self.direction:
             case "idle":
                 dir_key = f"idle_{self.last_dir}"

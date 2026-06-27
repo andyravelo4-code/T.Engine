@@ -180,6 +180,7 @@ def spawn_bones(x, y, world, amount=6):
         vy = math.sin(angle) * speed - 0.3
         val = random.randint(180, 230)
         color = (val, val, val - 20, random.randint(180, 255))
+        color = (random.randint(120, 180), 0, 0, random.randint(100, 180))
         lifetime = random.randint(20, 40)
         p = Particle(x + random.uniform(-1, 1), y + random.uniform(-1, 1),
                      vx, vy, color, lifetime, size=2,

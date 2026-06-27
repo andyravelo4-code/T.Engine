@@ -33,7 +33,7 @@ class Block(Object):
                 self.x += speed
                 return 'right'
         else:
-            if overlap_up < overlap_down:
+            if overlap_up < overlap_down:#0343771036
                 self.y -= speed
                 return 'up'
             else:

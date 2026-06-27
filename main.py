@@ -11,8 +11,8 @@ from Entities.Chest import Chest
 from Entities.Light import Light
 
 MAP_MODE = "single"
-MAP_BIOME = "dungeon"
-MAP_BIOMES = [ "desert"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
+MAP_BIOME = "cave"
+MAP_BIOMES = [ "desert","island","hills"]  # used when MAP_MODE is island/surface/multi (or list of (biome,weight) for multi)
 
 e.init(300, 200, title="Game", fps=60, display_scale=4, pixel_art=True)
 e.resources.image(0, "./assests/images/feuille1.png")
@@ -57,7 +57,7 @@ game_map = Map(world)
 world.map = game_map
 if MAP_MODE == "single":
     game_map.generate(
-        MAP_BIOME, 30, 30,
+        MAP_BIOME,15, 15,
         npc_count=2, player=player,
         npc_configs=[
             {"frames_dict": frames_dict, "max_health": 80, "speed": 0.6, "punch_damage": 4, "punch_cooldown": 40},
@@ -104,9 +104,10 @@ elif MAP_MODE == "island":
              ]},
         ],
         tile_images={
-            4:{"bank":stuff,"variants":[(i,5) for i in range(2,4)]},
+            4:{"bank":stuff,"variants":[(1,4),(2,4),(0,4), (0,3),(1,3),(3,5),(3,4)]+[(i,2) for i in range(3)]},
             #5:{"bank":rev , "variants":[(6,1),(3,1)]}
-        }
+        },
+        
     )
 elif MAP_MODE == "surface":
     game_map.generate_surface(
@@ -142,7 +143,7 @@ e.active_camera = cam
 inventory = Inventory(player)
 
 from Entities.Light import Light
-torch = Light(0, 0, 80, num_rays=32, reflective_bounce=True, arc_degrees=360)
+torch = Light(0, 0, 80, num_rays=32, reflective_bounce=True, arc_degrees=360, color=(249,194,43))
 #world.lights.append(torch)
 
 
@@ -154,7 +155,7 @@ def update():
 
     if e.btnp(e.KEY_I):
         inventory.toggle()
-
+    #torch.x,torch.y = player.x+4,player.y+player.h/2#e._global_mouse_pos
     if not inventory.open:
         if e.btn(e.KEY_ESCAPE):
             e.quit()

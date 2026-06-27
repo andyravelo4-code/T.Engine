@@ -69,7 +69,7 @@ class Sword(Item):
             self.pos_angle = self.start_slash_angle + (arc_size * progress * self.p)
 
             # Extension du bras (punch)
-            self.radius = 7 + math.sin(progress * math.pi) * 5
+            self.radius = 8 + math.sin(progress * math.pi) * 5
 
             # La rotation suit l'angle de position
             self.rotation = math.degrees(self.pos_angle)
@@ -94,14 +94,14 @@ class Sword(Item):
                 self.is_slashing = False
         else:
             # État de repos : l'épée suit la souris
-            self.radius = 9
+            self.radius = 8
             target_pos_angle = mouse_angle - (math.pi / 2) * self.n
 
             # Interpolation fluide
             diff = (target_pos_angle - self.pos_angle + math.pi) % (
                 2 * math.pi
             ) - math.pi
-            self.pos_angle += diff * 1
+            self.pos_angle += diff * 0.5
 
             # La rotation suit l'angle de position
             self.rotation = math.degrees(self.pos_angle)
@@ -138,7 +138,7 @@ class Sword(Item):
                             r = radius - t2
                             pts.append((cx + math.cos(rad) * r, cy + math.sin(rad) * r))
                         if len(pts) >= 3:
-                            draw.polygon(pts, fill=(152, 159, 126, alpha))
+                            draw.polygon(pts, fill=(255,255,255,alpha))#(172, 179, 146, alpha))
                         self._slash_cache[t] = surf
                 e.graphics.screen.blit(self._slash_cache[self.slash_timer], (
                     self.parent.x + self.parent.w / 2 - 32 + e.graphics._camera_x,
